@@ -2508,6 +2508,7 @@ static int haptics_load_custom_effect(struct haptics_chip *chip,
 	struct custom_fifo_data custom_data = {};
 	struct fifo_cfg *fifo;
 	int rc;
+  int i;
 
 	if (!chip->custom_effect || !chip->custom_effect->fifo)
 		return -ENOMEM;
@@ -2554,7 +2555,16 @@ static int haptics_load_custom_effect(struct haptics_chip *chip,
 				custom_data.length)) {
 		rc = -EFAULT;
 		goto cleanup;
-	}
+	} else {
+    printk(KERN_CONT "FIFO data: ");
+    for (i = 0; i < custom_data.length; i++) {
+      printk(KERN_CONT "%hhd", fifo->samples[i]);
+      if (i < custom_data.length - 1) {
+        printk(KERN_CONT ", ");
+      }
+    }
+    printk(KERN_CONT "\n");
+  }
 
 #ifndef OPLUS_FEATURE_CHG_BASIC
 	dev_dbg(chip->dev, "Copy custom FIFO samples successfully\n");
