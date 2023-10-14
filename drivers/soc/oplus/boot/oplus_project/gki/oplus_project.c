@@ -88,7 +88,6 @@ extern char build_variant[];
 extern char sim_card_num[];
 #endif
 extern char cdt[];
-extern char serial_no[];
 
 static void init_project_version(void)
 {
@@ -253,7 +252,6 @@ int rpmb_is_enable(void)
 }
 EXPORT_SYMBOL(rpmb_is_enable);
 
-
 unsigned int get_eng_version(void)
 {
     init_project_version();
@@ -262,31 +260,7 @@ unsigned int get_eng_version(void)
 }
 EXPORT_SYMBOL(get_eng_version);
 
-bool oplus_daily_build(void)
-{
-    static int daily_build = -1;
-    int eng_version = 0;
-
-    if (daily_build != -1)
-        return daily_build;
-
-    if (strstr(build_variant, "userdebug") ||
-        strstr(build_variant, "eng")) {
-        daily_build = true;
-    } else {
-        daily_build = false;
-    }
-
-    eng_version = get_eng_version();
-    if ((ALL_NET_CMCC_TEST == eng_version) || (ALL_NET_CMCC_FIELD == eng_version) ||
-        (ALL_NET_CU_TEST == eng_version) || (ALL_NET_CU_FIELD == eng_version) ||
-        (ALL_NET_CT_TEST == eng_version) || (ALL_NET_CT_FIELD == eng_version)){
-        daily_build = false;
-    }
-
-    return daily_build;
-}
-EXPORT_SYMBOL(oplus_daily_build);
+extern char *saved_command_line;
 
 bool is_confidential(void)
 {
@@ -309,16 +283,6 @@ uint32_t get_oplus_feature(enum F_INDEX index)
 }
 EXPORT_SYMBOL(get_oplus_feature);
 
-#define SERIALNO_LEN 16
-unsigned int get_serialID()
-{
-    unsigned int serial_id = 0xFFFFFFFF;
-
-    sscanf(serial_no, "%x", &serial_id);
-    return serial_id;
-}
-EXPORT_SYMBOL(get_serialID);
-
 static void dump_ocp_info(struct seq_file *s)
 {
     init_project_version();
@@ -333,11 +297,6 @@ static void dump_ocp_info(struct seq_file *s)
         g_project->nDataSCDT.PmicOcp[3],
         g_project->nDataSCDT.PmicOcp[4],
         g_project->nDataSCDT.PmicOcp[5]);
-}
-
-static void dump_serial_info(struct seq_file *s)
-{
-    seq_printf(s, "0x%x", get_serialID());
 }
 
 static void dump_oplus_feature(struct seq_file *s)
@@ -449,9 +408,6 @@ static int project_read_func(struct seq_file *s, void *v)
     case OCP_NUMBER:
         dump_ocp_info(s);
         break;
-    case SERIAL_NUMBER:
-        dump_serial_info(s);
-        break;
     case ENG_VERSION:
         dump_eng_version(s);
         break;
@@ -540,10 +496,6 @@ static int __init oplus_project_init(void)
         goto error_init;
 
     p_entry = proc_create_data("ocp", S_IRUGO, oplus_info, &project_info_fops, UINT2Ptr(OCP_NUMBER));
-    if (!p_entry)
-        goto error_init;
-
-    p_entry = proc_create_data("serialID", S_IRUGO, oplus_info, &project_info_fops, UINT2Ptr(SERIAL_NUMBER));
     if (!p_entry)
         goto error_init;
 

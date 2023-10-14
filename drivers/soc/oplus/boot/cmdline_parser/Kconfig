@@ -7,38 +7,14 @@ config OPLUS_FEATURE_CMDLINE
 	help
 	  define this config to get command line.
 
-config OPLUS_FEATURE_OPLUSBOOT
-	tristate "Oplus android boot"
-	default n
-	help
-	  define this config to get android boot cmdline.
-
 config OPLUS_FEATURE_CHARGERPRESENT
 	tristate "Oplus charger present"
 	default n
 	help
 	  define this config to get charger present cmdline.
 
-config OPLUS_FEATURE_BUILDVARIANT
-	tristate "Oplus buildvariant"
-	default n
-	help 
-	  define this config to get buildvariant cmdline.
-
 config OPLUS_FEATURE_SIMCARDNUM
 	tristate "Oplus simcardnum"
 	default n
 	help
 	  define this config to get simcardnum cmdline.
-
-config OPLUS_FEATURE_CDT
-	tristate "Oplus cdt"
-	default n
-	help
-	  define this config to get cdt_integrity cmdline.
-
-config OPLUS_FEATURE_BOOTARGS
-	tristate "Oplus bootargs"
-	default n
-	help
-	  try to get boot cmdline.
