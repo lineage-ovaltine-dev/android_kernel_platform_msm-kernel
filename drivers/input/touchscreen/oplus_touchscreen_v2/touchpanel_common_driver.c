@@ -4182,22 +4182,9 @@ extern char verified_bootstate[];
 #endif
 int get_oem_verified_boot_state(void)
 {
-#if IS_BUILTIN(CONFIG_TOUCHPANEL_OPLUS)
-    if (strstr(saved_command_line, "androidboot.verifiedbootstate=orange")) {
-        oem_verifiedbootstate = OEM_VERIFIED_BOOT_STATE_UNLOCKED;
-    } else {
-        oem_verifiedbootstate = OEM_VERIFIED_BOOT_STATE_LOCKED;
-    }
-#else
-    if (strstr(verified_bootstate, "orange")) {
-        oem_verifiedbootstate = OEM_VERIFIED_BOOT_STATE_UNLOCKED;
-    } else {
-        oem_verifiedbootstate = OEM_VERIFIED_BOOT_STATE_LOCKED;
-    }
-#endif
+    oem_verifiedbootstate = OEM_VERIFIED_BOOT_STATE_UNLOCKED;
     return 0;
 }
-
 EXPORT_SYMBOL(get_oem_verified_boot_state);
 
 /*******Part4:Extern Function  Area********************************/
