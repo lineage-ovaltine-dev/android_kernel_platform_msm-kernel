@@ -927,7 +927,7 @@ static void cooling_device_stats_setup(struct thermal_cooling_device *cdev)
 	var += sizeof(*stats->time_in_state) * states;
 	var += sizeof(*stats->trans_table) * states * states;
 
-	stats = kvzalloc(var, GFP_KERNEL);
+	stats = kzalloc(var, GFP_KERNEL);
 	if (!stats)
 		return;
 
@@ -946,7 +946,7 @@ static void cooling_device_stats_setup(struct thermal_cooling_device *cdev)
 
 static void cooling_device_stats_destroy(struct thermal_cooling_device *cdev)
 {
-	kvfree(cdev->stats);
+	kfree(cdev->stats);
 	cdev->stats = NULL;
 }
 
