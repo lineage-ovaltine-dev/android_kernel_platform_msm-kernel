@@ -53,18 +53,9 @@ endif
 obj-$(CONFIG_OPLUS_SENSOR_CONSUMER_IR_CORE) += oplus/oplus_consumer_ir/
 #endif /* CONFIG_OPLUS_SENSOR_CONSUMER_IR */
 
-
-#ifdef OPLUS_DFR_FEATURE
-obj-y += oplus/dfr/
-#endif /* OPLUS_DFR_FEATURE */
-
 #ifdef OPLUS_FEATURE_MIDAS_GKI
 obj-$(CONFIG_OPLUS_FEATURE_MIDAS_GKI) += oplus/power/midas/
 #endif
-
-#ifdef OPLUS_FEATURE_DFT
-obj-y += oplus/dft/
-#endif /* ifdef OPLUS_FEATURE_DFT */
 
 #ifdef OPLUS_FEATURE_BOOT
 obj-y += oplus/boot/
