@@ -108,7 +108,6 @@ cpufreq_effiency.ko
 buildvariant.ko
 simcardnum.ko
 cdt_integrity.ko
-shutdown_speed.ko
 oplus_project.ko
 boot_mode.ko
 horae_shell_temp.ko
@@ -116,16 +115,12 @@ cpu_jankinfo.ko
 cpufreq_health.ko
 qcom_enhance_watchdog.ko
 qmp-debugfs-client.ko
-oplus_phoenix.ko
-shutdown_detect.ko
 bootloader_log.ko
-oplus_pmicwd.ko
 qpnp-power-on.ko
 oplus_saupwk.ko
 saupwk.ko
 kernel_fb.ko
 cpufreq_bouncing.ko
-force_shutdown.ko
 oplus_bsp_midas.ko
 qcom_rimps.ko
 c1dcvs_vendor.ko

@@ -11,7 +11,6 @@
 #include <linux/errno.h>
 #include <linux/types.h>
 
-#if IS_MODULE(CONFIG_OPLUS_FEATURE_QCOM_PMICWD)
 #include <linux/regulator/driver.h>
 #include <linux/regulator/machine.h>
 #include <linux/regulator/of_regulator.h>
@@ -79,7 +78,6 @@ struct qpnp_pon {
        ktime_t                 kpdpwr_last_release_time;
        bool                    log_kpd_event;
 };
-#endif
 
 /**
  * enum pon_trigger_source: List of PON trigger sources
