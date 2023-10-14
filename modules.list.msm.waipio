@@ -100,12 +100,8 @@ mem-offline.ko
 qcom_aoss.ko
 msm_qmp.ko
 sched-walt-debug.ko
-oplusboot.ko
-buildvariant.ko
 simcardnum.ko
-cdt_integrity.ko
 oplus_project.ko
-boot_mode.ko
 horae_shell_temp.ko
 cpu_jankinfo.ko
 qcom_enhance_watchdog.ko
