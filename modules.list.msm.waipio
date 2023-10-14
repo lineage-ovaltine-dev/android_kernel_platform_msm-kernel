@@ -1,4 +1,3 @@
-phoenix_reboot_speed.ko
 gh_virt_wdt.ko
 qcom_wdt_core.ko
 qcom_cpu_vendor_hooks.ko
