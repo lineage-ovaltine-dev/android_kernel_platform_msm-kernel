@@ -254,7 +254,6 @@ int kgsl_devfreq_target(struct device *dev, unsigned long *freq, u32 flags)
 		if (!pwrscale->enabled)
 			return 0;
 		return -EPROTO;
-
 	}
 	pwr = &device->pwrctrl;
 
@@ -390,9 +389,6 @@ int kgsl_devfreq_get_cur_freq(struct device *dev, unsigned long *freq)
 			return 0;
 		return -EPROTO;
 	}
-
-	if (!device->pwrscale.devfreq_enabled)
-		return -EPROTO;
 
 	mutex_lock(&device->mutex);
 	*freq = kgsl_pwrctrl_active_freq(&device->pwrctrl);

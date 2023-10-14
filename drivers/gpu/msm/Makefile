@@ -3,10 +3,6 @@ ccflags-y += -I$(src)
 
 obj-$(CONFIG_QCOM_KGSL) += msm_kgsl.o
 
-ifdef CONFIG_OPLUS_FEATURE_MM_OSVELTE
-ccflags-y  += -I$(srctree)/mm/oplus_mm/mm_osvelte/
-endif
-
 msm_kgsl-y = \
 	kgsl.o \
 	kgsl_bus.o \
