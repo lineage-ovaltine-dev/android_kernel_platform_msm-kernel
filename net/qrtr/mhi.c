@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
  * Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/mhi.h>
@@ -50,7 +49,7 @@ static void qcom_mhi_qrtr_ul_callback(struct mhi_device *mhi_dev,
 }
 
 /* Send data over MHI */
-static int __qcom_mhi_qrtr_send(struct qrtr_endpoint *ep, struct sk_buff *skb)
+static int qcom_mhi_qrtr_send(struct qrtr_endpoint *ep, struct sk_buff *skb)
 {
 	struct qrtr_mhi_dev *qdev = container_of(ep, struct qrtr_mhi_dev, ep);
 	int rc;
@@ -68,7 +67,7 @@ static int __qcom_mhi_qrtr_send(struct qrtr_endpoint *ep, struct sk_buff *skb)
 
 	rc = mhi_queue_skb(qdev->mhi_dev, DMA_TO_DEVICE, skb, skb->len,
 			   MHI_EOT);
-	if (rc && rc != -EAGAIN)
+	if (rc)
 		goto free_skb;
 
 	return rc;
@@ -77,18 +76,6 @@ free_skb:
 	if (skb->sk)
 		sock_put(skb->sk);
 	kfree_skb(skb);
-
-	return rc;
-}
-
-static int qcom_mhi_qrtr_send(struct qrtr_endpoint *ep, struct sk_buff *skb)
-{
-	int rc;
-
-	do {
-		rc = __qcom_mhi_qrtr_send(ep, skb);
-		usleep_range(1000, 2000);
-	} while (rc == -EAGAIN);
 
 	return rc;
 }
@@ -136,9 +123,6 @@ static int qcom_mhi_qrtr_probe(struct mhi_device *mhi_dev,
 
 	qdev->mhi_dev = mhi_dev;
 	qdev->dev = &mhi_dev->dev;
-	#ifdef CONFIG_OPLUS_POWERINFO_STANDBY_DEBUG
-	qdev->ep.dev = &mhi_dev->dev;
-	#endif
 	qdev->ep.xmit = qcom_mhi_qrtr_send;
 	init_completion(&qdev->prepared);
 
