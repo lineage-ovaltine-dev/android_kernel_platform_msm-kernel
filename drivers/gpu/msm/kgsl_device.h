@@ -306,12 +306,6 @@ struct kgsl_device {
 	/** @fence_trace_array: A local trace array for fence debugging */
 	struct trace_array *fence_trace_array;
 
-#ifdef CONFIG_OPLUS_GPU_MINIDUMP
-//MULTIMEIDA.FEATURE.GPU.MINIDUMP, 2021/07/26, add for oplus gpu mini dump
-	bool snapshot_control;
-	int snapshotfault;
-#endif
-
 	/** @l3_vote: Enable/Disable l3 voting */
 	bool l3_vote;
 	/** @pdev_loaded: Flag to test if platform driver is probed */
