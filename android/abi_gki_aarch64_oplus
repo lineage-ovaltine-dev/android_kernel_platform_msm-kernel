@@ -2801,8 +2801,10 @@
   __traceiter_android_vh_cpu_idle_enter
   __traceiter_android_vh_cpu_idle_exit
   __traceiter_android_vh_cpu_up
+  __traceiter_android_vh_del_page_from_lrulist
   __traceiter_android_vh_check_page_look_around_ref
   __traceiter_android_vh_do_futex
+  __traceiter_android_vh_do_page_trylock
   __traceiter_android_vh_do_send_sig_info
   __traceiter_android_vh_do_traversal_lruvec
   __traceiter_android_vh_drain_all_pages_bypass
@@ -2868,6 +2870,12 @@
   __traceiter_android_vh_prepare_update_load_avg_se
   __traceiter_android_vh_printk_hotplug
   __traceiter_android_vh_process_killed
+  __traceiter_android_vh_record_mutex_lock_starttime
+  __traceiter_android_vh_record_pcpu_rwsem_starttime
+  __traceiter_android_vh_record_rtmutex_lock_starttime
+  __traceiter_android_vh_record_rwsem_lock_starttime
+  __traceiter_android_vh_remove_vmalloc_stack
+  __traceiter_android_vh_killed_process
   __traceiter_android_vh_revert_creds
   __traceiter_android_vh_record_mutex_lock_starttime
   __traceiter_android_vh_record_rtmutex_lock_starttime
@@ -3052,8 +3060,10 @@
   __tracepoint_android_vh_cpu_idle_enter
   __tracepoint_android_vh_cpu_idle_exit
   __tracepoint_android_vh_cpu_up
+  __tracepoint_android_vh_del_page_from_lrulist
   __tracepoint_android_vh_check_page_look_around_ref
   __tracepoint_android_vh_do_futex
+  __tracepoint_android_vh_do_page_trylock
   __tracepoint_android_vh_do_send_sig_info
   __tracepoint_android_vh_do_traversal_lruvec
   __tracepoint_android_vh_drain_all_pages_bypass
@@ -3119,6 +3129,12 @@
   __tracepoint_android_vh_prepare_update_load_avg_se
   __tracepoint_android_vh_printk_hotplug
   __tracepoint_android_vh_process_killed
+  __tracepoint_android_vh_record_mutex_lock_starttime
+  __tracepoint_android_vh_record_pcpu_rwsem_starttime
+  __tracepoint_android_vh_record_rtmutex_lock_starttime
+  __tracepoint_android_vh_record_rwsem_lock_starttime
+  __tracepoint_android_vh_remove_vmalloc_stack
+  __tracepoint_android_vh_killed_process
   __tracepoint_android_vh_revert_creds
   __tracepoint_android_vh_record_mutex_lock_starttime
   __tracepoint_android_vh_record_rtmutex_lock_starttime
@@ -3665,4 +3681,3 @@
   xhci_ring_free
   xhci_trb_virt_to_dma
   mdmreason_set
-  zero_pfn

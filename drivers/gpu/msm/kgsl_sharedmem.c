@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2002,2007-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -16,6 +15,10 @@
 #include "kgsl_pool.h"
 #include "kgsl_reclaim.h"
 #include "kgsl_sharedmem.h"
+
+#if IS_ENABLED(CONFIG_OPLUS_FEATURE_MM_OSVELTE)
+#include "common.h"
+#endif /* CONFIG_OPLUS_FEATURE_MM_OSVELTE */
 
 /*
  * The user can set this from debugfs to force failed memory allocations to
@@ -1080,7 +1083,6 @@ static int kgsl_memdesc_file_setup(struct kgsl_memdesc *memdesc, uint64_t size)
 		return ret;
 	}
 
-	mapping_set_unevictable(memdesc->shmem_filp->f_mapping);
 	return 0;
 }
 
@@ -1786,3 +1788,49 @@ void kgsl_free_globals(struct kgsl_device *device)
 		kfree(md);
 	}
 }
+
+#if IS_ENABLED(CONFIG_OPLUS_FEATURE_MM_OSVELTE)
+
+void dump_kgsl_process_mem_detail(struct kgsl_process_private *priv)
+{
+	int i = 0;
+	int id = 0;
+	struct kgsl_mem_entry *entry = NULL;
+	uint64_t memtype_detail[KGSL_MEMTYPE_KERNEL + 1] = {0};
+
+	spin_lock(&priv->mem_lock);
+	for (entry = idr_get_next(&priv->mem_idr, &id); entry;
+		id++, entry = idr_get_next(&priv->mem_idr, &id)) {
+		struct kgsl_memdesc *memdesc;
+		unsigned int type;
+
+		if (!kgsl_mem_entry_get(entry))
+			continue;
+
+		/*
+		 * we must unlock the mem_lock
+		 * This is to avoid a deadlock where we put back last reference of the
+		 * process mem entry (via kgsl_mem_entry_put_deferred)
+		 */
+		spin_unlock(&priv->mem_lock);
+
+		memdesc = &entry->memdesc;
+		type = kgsl_memdesc_get_memtype(memdesc);
+
+		if (type >= 0 && type <= KGSL_MEMTYPE_KERNEL)
+			memtype_detail[type] += memdesc->size;
+
+		kgsl_mem_entry_put_deferred(entry);
+		spin_lock(&priv->mem_lock);
+	}
+	spin_unlock(&priv->mem_lock);
+
+	osvelte_info("%-16s %-5s \n", "memtype", "size");
+
+	for (i = 0; i <= KGSL_MEMTYPE_KERNEL; i++) {
+		if (memtype_detail[i] > 0)
+			osvelte_info("%-16d %-5d\n", i, memtype_detail[i] / SZ_1K);
+	}
+}
+
+#endif /* CONFIG_OPLUS_FEATURE_MM_OSVELTE */

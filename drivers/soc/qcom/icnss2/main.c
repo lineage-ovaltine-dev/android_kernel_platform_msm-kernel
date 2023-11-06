@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2015-2020, 2021, The Linux Foundation.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * All rights reserved.
  */
 
@@ -54,6 +54,7 @@
 #include "power.h"
 #include "genl.h"
 #ifdef OPLUS_FEATURE_WIFI_MAC
+//WuGuotian@CONNECTIVITY.WIFI.HARDWARE.MAC.1068489, 2021/02/08,Add for boot wlan mode not use NV mac
 #include <soc/oplus/system/boot_mode.h>
 #include <soc/oplus/system/oplus_project.h>
 #endif /* OPLUS_FEATURE_WIFI_MAC */
@@ -133,6 +134,7 @@ static const char * const icnss_pdr_cause[] = {
 };
 
 #ifdef OPLUS_FEATURE_WIFI_DCS_SWITCH
+//wuguotian@CONNECTIVITY.WIFI.HARDWARE.SWITCH.2877804 , 2020/02/24
 //Add for: check fw status for switch issue
 static unsigned int cnssprobestate = 0;
 #endif /* OPLUS_FEATURE_WIFI_DCS_SWITCH */
@@ -153,11 +155,8 @@ static ssize_t icnss_sysfs_store(struct kobject *kobj,
 {
 	struct icnss_priv *priv = icnss_get_plat_priv();
 
-	if (priv)
-		atomic_set(&priv->is_shutdown, true);
-
+	atomic_set(&priv->is_shutdown, true);
 	icnss_pr_dbg("Received shutdown indication");
-
 	return count;
 }
 
@@ -467,7 +466,7 @@ static int icnss_send_smp2p(struct icnss_priv *priv,
 	unsigned int value = 0;
 	int ret;
 
-	if (!priv || IS_ERR_OR_NULL(priv->smp2p_info[smp2p_entry].smem_state))
+	if (IS_ERR_OR_NULL(priv->smp2p_info[smp2p_entry].smem_state))
 		return -EINVAL;
 
 	/* No Need to check FW_DOWN for ICNSS_RESET_MSG */
@@ -508,7 +507,7 @@ static int icnss_send_smp2p(struct icnss_priv *priv,
 		    msg_id == ICNSS_SOC_WAKE_REL) {
 			if (!wait_for_completion_timeout(
 					&priv->smp2p_soc_wake_wait,
-					priv->ctrl_params.soc_wake_timeout)) {
+					msecs_to_jiffies(SMP2P_SOC_WAKE_TIMEOUT))) {
 				icnss_pr_err("SMP2P Soc Wake timeout msg %d, %s\n", msg_id,
 					     icnss_smp2p_str[smp2p_entry]);
 				if (!test_bit(ICNSS_FW_DOWN, &priv->state))
@@ -541,11 +540,11 @@ static irqreturn_t fw_crash_indication_handler(int irq, void *ctx)
 
 	icnss_pr_err("Received early crash indication from FW\n");
 
-	if (priv) {
-		if (priv->wpss_self_recovery_enabled)
-			mod_timer(&priv->wpss_ssr_timer,
-				   jiffies + priv->ctrl_params.wpss_ssr_timeout);
+	if (priv->wpss_self_recovery_enabled)
+		mod_timer(&priv->wpss_ssr_timer,
+			  jiffies + msecs_to_jiffies(ICNSS_WPSS_SSR_TIMEOUT));
 
+	if (priv) {
 		set_bit(ICNSS_FW_DOWN, &priv->state);
 		icnss_ignore_fw_timeout(true);
 
@@ -751,6 +750,7 @@ static int icnss_setup_dms_mac(struct icnss_priv *priv)
 	 * Thus assert on failure to get MAC from DMS even after retries
 	 */
 #ifndef OPLUS_FEATURE_WIFI_MAC
+    //WuGuotian@CONNECTIVITY.WIFI.HARDWARE.MAC.1068489, 2021/02/08,Add for boot wlan mode not use NV mac
     if (priv->use_nv_mac) {
 #else
     if ((get_boot_mode() !=  MSM_BOOT_MODE__WLAN) && priv->use_nv_mac) {
@@ -1182,7 +1182,7 @@ static int icnss_driver_event_fw_init_done(struct icnss_priv *priv, void *data)
 
 	if (test_bit(ICNSS_COLD_BOOT_CAL, &priv->state)) {
 		mod_timer(&priv->recovery_timer,
-			  jiffies + priv->ctrl_params.cal_timeout);
+			  jiffies + msecs_to_jiffies(ICNSS_CAL_TIMEOUT));
 		ret = wlfw_wlan_mode_send_sync_msg(priv,
 			(enum wlfw_driver_mode_enum_v01)ICNSS_CALIBRATION);
 	} else {
@@ -2124,7 +2124,7 @@ static int icnss_wpss_notifier_nb(struct notifier_block *nb,
 
 	if (notif->crashed)
 		mod_timer(&priv->recovery_timer,
-			  jiffies + priv->ctrl_params.recovery_timeout);
+			  jiffies + msecs_to_jiffies(ICNSS_RECOVERY_TIMEOUT));
 out:
 	icnss_pr_vdbg("Exit %s,state: 0x%lx\n", __func__, priv->state);
 	return NOTIFY_OK;
@@ -2205,7 +2205,7 @@ static int icnss_modem_notifier_nb(struct notifier_block *nb,
 
 	if (notif->crashed)
 		mod_timer(&priv->recovery_timer,
-			  jiffies + priv->ctrl_params.recovery_timeout);
+			  jiffies + msecs_to_jiffies(ICNSS_RECOVERY_TIMEOUT));
 out:
 	icnss_pr_vdbg("Exit %s,state: 0x%lx\n", __func__, priv->state);
 	return NOTIFY_OK;
@@ -2318,9 +2318,6 @@ static void icnss_pdr_notifier_cb(int state, char *service_path, void *priv_cb)
 	struct icnss_uevent_fw_down_data fw_down_data = {0};
 	enum icnss_pdr_cause_index cause = ICNSS_ROOT_PD_CRASH;
 
-	if (!priv)
-		return;
-
 	icnss_pr_dbg("PD service notification: 0x%lx state: 0x%lx\n",
 		     state, priv->state);
 
@@ -2366,7 +2363,7 @@ static void icnss_pdr_notifier_cb(int state, char *service_path, void *priv_cb)
 		if (event_data->crashed)
 			mod_timer(&priv->recovery_timer,
 				  jiffies +
-				  priv->ctrl_params.recovery_timeout);
+				  msecs_to_jiffies(ICNSS_RECOVERY_TIMEOUT));
 
 		icnss_driver_event_post(priv, ICNSS_DRIVER_EVENT_PD_SERVICE_DOWN,
 					ICNSS_EVENT_SYNC, event_data);
@@ -4151,8 +4148,6 @@ static int icnss_smmu_fault_handler(struct iommu_domain *domain,
 
 	if (test_bit(ICNSS_FW_READY, &priv->state)) {
 		fw_down_data.crashed = true;
-		icnss_call_driver_uevent(priv, ICNSS_UEVENT_SMMU_FAULT,
-					 &fw_down_data);
 		icnss_call_driver_uevent(priv, ICNSS_UEVENT_FW_DOWN,
 					 &fw_down_data);
 	}
@@ -4265,6 +4260,7 @@ void icnss_add_fw_prefix_name(struct icnss_priv *priv, char *prefix_name,
 			  QCA6750_PATH_PREFIX "%s", name);
 
 #ifdef OPLUS_FEATURE_WIFI_BDF
+    //XiaSong@CONNECTIVITY.WIFI.HARDWARE.BDF.1065227 , 2021/08/27, add for qca6750 bdf/regdb
     scnprintf(prefix_name, ICNSS_MAX_FILE_NAME, "%s", name);
 #else
     scnprintf(prefix_name, ICNSS_MAX_FILE_NAME,
@@ -4295,10 +4291,6 @@ MODULE_DEVICE_TABLE(of, icnss_dt_match);
 static void icnss_init_control_params(struct icnss_priv *priv)
 {
 	priv->ctrl_params.qmi_timeout = WLFW_TIMEOUT;
-	priv->ctrl_params.recovery_timeout = msecs_to_jiffies(ICNSS_RECOVERY_TIMEOUT);
-	priv->ctrl_params.soc_wake_timeout = msecs_to_jiffies(SMP2P_SOC_WAKE_TIMEOUT);
-	priv->ctrl_params.cal_timeout = msecs_to_jiffies(ICNSS_CAL_TIMEOUT);
-	priv->ctrl_params.wpss_ssr_timeout = msecs_to_jiffies(ICNSS_WPSS_SSR_TIMEOUT);
 	priv->ctrl_params.quirks = ICNSS_QUIRKS_DEFAULT;
 	priv->ctrl_params.bdf_type = ICNSS_BDF_TYPE_DEFAULT;
 
@@ -4343,6 +4335,7 @@ static inline void icnss_runtime_pm_deinit(struct icnss_priv *priv)
 }
 
 #ifdef OPLUS_FEATURE_WIFI_DCS_SWITCH
+//HuiTAO@CONNECTIVITY.WIFI.HARDWARE.SWITCH.2877804 , 2020/02/24
 //Add for: check fw status for switch issue
 static void icnss_create_fw_state_kobj(void);
 static ssize_t icnss_show_fw_ready(struct device_driver *driver, char *buf)
@@ -4448,6 +4441,7 @@ static int icnss_probe(struct platform_device *pdev)
 	icnss_read_device_configs(priv);
 
 #ifdef OPLUS_FEATURE_WIFI_DCS_SWITCH
+	//HuiTAO@CONNECTIVITY.WIFI.HARDWARE.SWITCH.2877804 , 2020/02/24
 	//Add for: check fw status for switch issue
 	icnss_create_fw_state_kobj();
 #endif /* OPLUS_FEATURE_WIFI_DCS_SWITCH */
@@ -4561,6 +4555,7 @@ static int icnss_probe(struct platform_device *pdev)
 	}
 
 #ifdef OPLUS_FEATURE_WIFI_DCS_SWITCH
+	//wuguotian@CONNECTIVITY.WIFI.HARDWARE.SWITCH.2877804, 2020/02/24
 	//Add for: check fw status for switch issue
 	cnssprobestate = CNSS_PROBE_SUCCESS;
 #endif /* OPLUS_FEATURE_WIFI_DCS_SWITCH */
@@ -4580,6 +4575,7 @@ out_free_resources:
 out_reset_drvdata:
 	dev_set_drvdata(dev, NULL);
 #ifdef OPLUS_FEATURE_WIFI_DCS_SWITCH
+    //wuguotian@CONNECTIVITY.WIFI.HARDWARE.SWITCH.2877804, 2020/02/24
     //Add for: check fw status for switch issue
     cnssprobestate = CNSS_PROBE_FAIL;
 #endif /* OPLUS_FEATURE_WIFI_DCS_SWITCH */
@@ -4907,6 +4903,7 @@ static struct platform_driver icnss_driver = {
 };
 
 #ifdef OPLUS_FEATURE_WIFI_DCS_SWITCH
+//HuiTAO@CONNECTIVITY.WIFI.HARDWARE.SWITCH.2877804, 2020/02/24
 //Add for: check fw status for switch issue
 static void icnss_create_fw_state_kobj(void) {
 	if (driver_create_file(&(icnss_driver.driver), &icnss_fw_ready_attr)) {

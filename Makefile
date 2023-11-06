@@ -576,6 +576,7 @@ CFLAGS_MODULE +=   -DOPLUS_FEATURE_WIFI_WSA
 #endif /* OPLUS_FEATURE_WIFI_BDF */
 
 #ifdef OPLUS_FEATURE_WIFI_DCS_SWITCH
+#Huitao@CONNECTIVITY.WIFI.HARDWARE.SWITCH.2877804 , add for wifi fw monitor
 KBUILD_CFLAGS +=   -DOPLUS_FEATURE_WIFI_DCS_SWITCH
 KBUILD_CPPFLAGS += -DOPLUS_FEATURE_WIFI_DCS_SWITCH
 CFLAGS_KERNEL +=   -DOPLUS_FEATURE_WIFI_DCS_SWITCH
@@ -1344,7 +1345,7 @@ dt_binding_check: scripts_dtc
 
 
 ifeq ($(KBUILD_EXTMOD),)
-core-y		+= kernel/ certs/ mm/ fs/ ipc/ security/ crypto/ block/
+core-y		+= kernel/ certs/ mm/ fs/ ipc/ security/ crypto/ block/ io_uring/
 
 vmlinux-dirs	:= $(patsubst %/,%,$(filter %/, \
 		     $(core-y) $(core-m) $(drivers-y) $(drivers-m) \

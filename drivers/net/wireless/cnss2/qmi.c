@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -46,6 +46,12 @@
 #define REG_ID_CHN_IN		1
 #define REG_ID_EU		2
 #define REG_ID_NA		3
+//add for second resources
+#define RESCOUSE_FIRST   1
+#define RESCOUSE_SECOND  2
+#define RESCOUSE_THIRD   3
+#define ELF_BDF_FILE_NAME_SEC         "bdwlansec.elf"
+#define ELF_BDF_FILE_NAME_GF_SEC      "bdwlangsec.elf"
 #endif /* OPLUS_FEATURE_WIFI_BDF */
 
 #define CONN_ROAM_FILE_NAME		"wlan-connection-roaming"
@@ -419,12 +425,6 @@ int cnss_wlfw_respond_mem_send_sync(struct cnss_plat_data *plat_priv)
 		return -ENOMEM;
 	}
 
-	if (plat_priv->fw_mem_seg_len > QMI_WLFW_MAX_NUM_MEM_SEG_V01) {
-		cnss_pr_err("Invalid seg len %u\n", plat_priv->fw_mem_seg_len);
-		ret = -EINVAL;
-		goto out;
-	}
-
 	req->mem_seg_len = plat_priv->fw_mem_seg_len;
 	for (i = 0; i < req->mem_seg_len; i++) {
 		if (!fw_mem[i].pa || !fw_mem[i].size) {
@@ -619,22 +619,6 @@ int cnss_wlfw_tgt_cap_send_sync(struct cnss_plat_data *plat_priv)
 	if (resp->ol_cpr_cfg_valid)
 		cnss_aop_ol_cpr_cfg_setup(plat_priv, &resp->ol_cpr_cfg);
 
-	/* Disable WLAN PDC in AOP firmware for boards which support on chip PMIC
-	 * so AOP will ignore SW_CTRL changes and do not update regulator votes.
-	 **/
-	for (i = 0; i < plat_priv->on_chip_pmic_devices_count; i++) {
-		if (plat_priv->board_info.board_id ==
-		    plat_priv->on_chip_pmic_board_ids[i]) {
-			cnss_pr_dbg("Disabling WLAN PDC for board_id: %02x\n",
-				    plat_priv->board_info.board_id);
-			ret = cnss_aop_send_msg(plat_priv,
-						"{class: wlan_pdc, ss: rf, res: pdc, enable: 0}");
-			if (ret < 0)
-				cnss_pr_dbg("Failed to Send AOP Msg");
-			break;
-		}
-	}
-
 	cnss_pr_dbg("Target capability: chip_id: 0x%x, chip_family: 0x%x, board_id: 0x%x, soc_id: 0x%x, otp_version: 0x%x\n",
 		    plat_priv->chip_info.chip_id,
 		    plat_priv->chip_info.chip_family,
@@ -672,6 +656,24 @@ static bool is_prj_support_region_id() {
         return false;
 }
 
+static bool is_udon_internal_prj_need_second_rescouse() {
+        int project_id = get_project();
+        cnss_pr_dbg("project: %d\n", project_id);
+        if (project_id == 22803) {
+                return true;
+        }
+        return false;
+}
+
+static bool is_udon_export_prj_need_second_rescouse() {
+        int project_id = get_project();
+        cnss_pr_dbg("project: %d\n", project_id);
+        if (project_id == 22881) {
+                return true;
+        }
+        return false;
+}
+
 static void cnss_get_oplus_bdf_file_name(struct cnss_plat_data *plat_priv, char* file_name, u32 filename_len) {
 	int reg_id = get_Operator_Version();
 	cnss_pr_dbg("region id: %d", reg_id);
@@ -687,6 +689,10 @@ static void cnss_get_oplus_bdf_file_name(struct cnss_plat_data *plat_priv, char*
 			} else {
 				snprintf(file_name, filename_len, ELF_BDF_FILE_NAME_GF);
 			}
+		} else if ((is_udon_internal_prj_need_second_rescouse() && RESCOUSE_SECOND == get_Modem_Version())
+			        || (is_udon_export_prj_need_second_rescouse() && RESCOUSE_THIRD == get_Modem_Version())) {
+			cnss_pr_dbg("RF id: %d", get_Modem_Version());
+			snprintf(file_name, filename_len, ELF_BDF_FILE_NAME_GF_SEC);
 		} else {
 			snprintf(file_name, filename_len, ELF_BDF_FILE_NAME_GF);
 		}
@@ -701,6 +707,10 @@ static void cnss_get_oplus_bdf_file_name(struct cnss_plat_data *plat_priv, char*
 			} else {
 				snprintf(file_name, filename_len, ELF_BDF_FILE_NAME);
 			}
+		} else if ((is_udon_internal_prj_need_second_rescouse() && RESCOUSE_SECOND == get_Modem_Version())
+			        || (is_udon_export_prj_need_second_rescouse() && RESCOUSE_THIRD == get_Modem_Version())) {
+			cnss_pr_dbg("RF id: %d", get_Modem_Version());
+			snprintf(file_name, filename_len, ELF_BDF_FILE_NAME_SEC);
 		} else {
 			snprintf(file_name, filename_len, ELF_BDF_FILE_NAME);
 		}
@@ -1300,8 +1310,7 @@ int cnss_wlfw_qdss_data_send_sync(struct cnss_plat_data *plat_priv, char *file_n
 		     resp->total_size == total_size) &&
 		   (resp->seg_id_valid == 1 && resp->seg_id == req->seg_id) &&
 		   (resp->data_valid == 1 &&
-		    resp->data_len <= QMI_WLFW_MAX_DATA_SIZE_V01) &&
-		   resp->data_len <= remaining) {
+		    resp->data_len <= QMI_WLFW_MAX_DATA_SIZE_V01)) {
 			memcpy(p_qdss_trace_data_temp,
 			       resp->data, resp->data_len);
 		} else {
@@ -2240,12 +2249,6 @@ int cnss_wlfw_qdss_trace_mem_info_send_sync(struct cnss_plat_data *plat_priv)
 		return -ENOMEM;
 	}
 
-	if (plat_priv->qdss_mem_seg_len > QMI_WLFW_MAX_NUM_MEM_SEG_V01) {
-		cnss_pr_err("Invalid seg len %u\n", plat_priv->qdss_mem_seg_len);
-		ret = -EINVAL;
-		goto out;
-	}
-
 	req->mem_seg_len = plat_priv->qdss_mem_seg_len;
 	for (i = 0; i < req->mem_seg_len; i++) {
 		cnss_pr_dbg("Memory for FW, va: 0x%pK, pa: %pa, size: 0x%zx, type: %u\n",
@@ -2294,74 +2297,6 @@ int cnss_wlfw_qdss_trace_mem_info_send_sync(struct cnss_plat_data *plat_priv)
 	kfree(resp);
 	return 0;
 
-out:
-	kfree(req);
-	kfree(resp);
-	return ret;
-}
-
-int cnss_wlfw_send_host_wfc_call_status(struct cnss_plat_data *plat_priv,
-					struct cnss_wfc_cfg cfg)
-{
-	struct wlfw_wfc_call_status_req_msg_v01 *req;
-	struct wlfw_wfc_call_status_resp_msg_v01 *resp;
-	struct qmi_txn txn;
-	int ret = 0;
-
-	if (!test_bit(CNSS_FW_READY, &plat_priv->driver_state)) {
-		cnss_pr_err("Drop host WFC indication as FW not initialized\n");
-		return -EINVAL;
-	}
-	req = kzalloc(sizeof(*req), GFP_KERNEL);
-	if (!req)
-		return -ENOMEM;
-
-	resp = kzalloc(sizeof(*resp), GFP_KERNEL);
-	if (!resp) {
-		kfree(req);
-		return -ENOMEM;
-	}
-
-	req->wfc_call_active_valid = 1;
-	req->wfc_call_active = cfg.mode;
-
-	cnss_pr_dbg("CNSS->FW: WFC_CALL_REQ: state: 0x%lx\n",
-		    plat_priv->driver_state);
-
-	ret = qmi_txn_init(&plat_priv->qmi_wlfw, &txn,
-			   wlfw_wfc_call_status_resp_msg_v01_ei, resp);
-	if (ret < 0) {
-		cnss_pr_err("CNSS->FW: WFC_CALL_REQ: QMI Txn Init: Err %d\n",
-			    ret);
-		goto out;
-	}
-
-	cnss_pr_dbg("Send WFC Mode: %d\n", cfg.mode);
-	ret = qmi_send_request(&plat_priv->qmi_wlfw, NULL, &txn,
-			       QMI_WLFW_WFC_CALL_STATUS_REQ_V01,
-			       WLFW_WFC_CALL_STATUS_REQ_MSG_V01_MAX_MSG_LEN,
-			       wlfw_wfc_call_status_req_msg_v01_ei, req);
-	if (ret < 0) {
-		qmi_txn_cancel(&txn);
-		cnss_pr_err("CNSS->FW: WFC_CALL_REQ: QMI Send Err: %d\n",
-			    ret);
-		goto out;
-	}
-
-	ret = qmi_txn_wait(&txn, QMI_WLFW_TIMEOUT_JF);
-	if (ret < 0) {
-		cnss_pr_err("FW->CNSS: WFC_CALL_RSP: QMI Wait Err: %d\n",
-			    ret);
-		goto out;
-	}
-
-	if (resp->resp.result != QMI_RESULT_SUCCESS_V01) {
-		cnss_pr_err("FW->CNSS: WFC_CALL_RSP: Result: %d Err: %d\n",
-			    resp->resp.result, resp->resp.error);
-		ret = -EINVAL;
-		goto out;
-	}
-	ret = 0;
 out:
 	kfree(req);
 	kfree(resp);
@@ -2614,11 +2549,6 @@ static void cnss_wlfw_request_mem_ind_cb(struct qmi_handle *qmi_wlfw,
 		return;
 	}
 
-	if (ind_msg->mem_seg_len > QMI_WLFW_MAX_NUM_MEM_SEG_V01) {
-		cnss_pr_err("Invalid seg len %u\n", ind_msg->mem_seg_len);
-		return;
-	}
-
 	plat_priv->fw_mem_seg_len = ind_msg->mem_seg_len;
 	for (i = 0; i < plat_priv->fw_mem_seg_len; i++) {
 		cnss_pr_dbg("FW requests for memory, size: 0x%x, type: %u\n",
@@ -2830,11 +2760,6 @@ static void cnss_wlfw_qdss_trace_req_mem_ind_cb(struct qmi_handle *qmi_wlfw,
 	if (plat_priv->qdss_mem_seg_len) {
 		cnss_pr_err("Ignore double allocation for QDSS trace, current len %u\n",
 			    plat_priv->qdss_mem_seg_len);
-		return;
-	}
-
-	if (ind_msg->mem_seg_len > QMI_WLFW_MAX_NUM_MEM_SEG_V01) {
-		cnss_pr_err("Invalid seg len %u\n", ind_msg->mem_seg_len);
 		return;
 	}
 

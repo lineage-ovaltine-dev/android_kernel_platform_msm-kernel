@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/kernel.h>
@@ -46,7 +46,7 @@
 #define REG_OFFSET		0x0
 
 /* Timeout Delay */
-#define TIMEOUT_US		1500
+#define TIMEOUT_US		500
 
 struct collapse_vote {
 	struct regmap	**regmap;
@@ -156,13 +156,13 @@ static int gdsc_init_is_enabled(struct gdsc *sc)
 		return 0;
 	}
 
-	regmap = sc->regmap;
-	mask = SW_COLLAPSE_MASK;
-
 	if (sc->collapse_count) {
 		for (i = 0; i < sc->collapse_count; i++)
 			regmap = sc->collapse_vote.regmap[i];
 		mask = BIT(sc->collapse_vote.vote_bit);
+	} else {
+		regmap = sc->regmap;
+		mask = SW_COLLAPSE_MASK;
 	}
 
 	ret = regmap_read(regmap, REG_OFFSET, &regval);

@@ -795,10 +795,14 @@ static int rt1711_tcpc_init(struct tcpc_device *tcpc, bool sw_reset)
 	rt1711_i2c_write8(tcpc, RT1711H_REG_DRP_TOGGLE_CYCLE, 4);
 	rt1711_i2c_write16(tcpc,
 		RT1711H_REG_DRP_DUTY_CTRL, TCPC_NORMAL_RP_DUTY);
-
-	/* Vconn OC */
-	rt1711_i2c_write8(tcpc, RT1711H_REG_VCONN_CLIMITEN, 1);
-
+#ifdef OPLUS_FEATURE_CHG_BASIC
+	/**
+	*Vconn OC Mode
+	*0:close Vconn output/default value
+	*1:current limit/There is a risk of burning
+	*rt1711_i2c_write8(tcpc, RT1711H_REG_VCONN_CLIMITEN, 1);
+	*/
+#endif
 	/* RX/TX Clock Gating (Auto Mode)*/
 	if (!sw_reset)
 		rt1711h_set_clock_gating(tcpc, true);

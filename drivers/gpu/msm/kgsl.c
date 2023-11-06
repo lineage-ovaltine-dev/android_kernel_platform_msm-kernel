@@ -606,6 +606,9 @@ static void kgsl_context_debug_info(struct kgsl_device *device)
 #endif
 
 #if IS_ENABLED(CONFIG_OPLUS_FEATURE_MM_OSVELTE)
+
+void dump_kgsl_process_mem_detail(struct kgsl_process_private *priv);
+
 static int kgsl_procinfo_show(struct seq_file *s, void *unused)
 {
 	struct kgsl_process_private *p;
@@ -638,7 +641,10 @@ long read_kgsl_mem_usage(enum mtrack_subtype type)
 
 void dump_kgsl_usage_stat(bool verbose)
 {
-	struct kgsl_process_private *p;
+	uint64_t sz = 0;
+	uint64_t max_sz = 0;
+	struct kgsl_process_private *p = NULL;
+	struct kgsl_process_private *max_sz_of_proc = NULL;
 	int type = KGSL_MEM_ENTRY_KERNEL;
 
 	osvelte_info("======= %s\n", __func__);
@@ -646,10 +652,24 @@ void dump_kgsl_usage_stat(bool verbose)
 
 	read_lock(&kgsl_driver.proclist_lock);
 	list_for_each_entry(p, &kgsl_driver.process_list, list) {
-		osvelte_info("%-16s %-5d %zu\n", p->comm, pid_nr(p->pid),
-			     atomic64_read(&p->stats[type].cur) / SZ_1K);
+		sz = atomic64_read(&p->stats[type].cur);
+		if (sz >= max_sz) {
+			max_sz = sz;
+			max_sz_of_proc = p;
+		}
+		osvelte_info("%-16s %-5d %zu\n", p->comm, pid_nr(p->pid), sz / SZ_1K);
 	}
+	kgsl_process_private_get(max_sz_of_proc);
 	read_unlock(&kgsl_driver.proclist_lock);
+
+	if (max_sz >= SZ_2G) {
+		osvelte_info(
+			"%-5d is max usage and over 2G, its memtype detail is blow\n",
+			pid_nr(max_sz_of_proc->pid));
+		dump_kgsl_process_mem_detail(max_sz_of_proc);
+	}
+
+	kgsl_process_private_put(max_sz_of_proc);
 }
 
 long read_pid_kgsl_mem_usage(enum mtrack_subtype mtype, pid_t pid)
@@ -2022,9 +2042,6 @@ long kgsl_ioctl_submit_commands(struct kgsl_device_private *dev_priv,
 				param->synclist, param->numsyncs);
 		if (result)
 			goto done;
-
-		if (!(syncobj->flags & KGSL_SYNCOBJ_SW))
-			syncobj->flags |= KGSL_SYNCOBJ_HW;
 	}
 
 	if (type & (CMDOBJ_TYPE | MARKEROBJ_TYPE)) {
@@ -2109,9 +2126,6 @@ long kgsl_ioctl_gpu_command(struct kgsl_device_private *dev_priv,
 				param->syncsize, param->numsyncs);
 		if (result)
 			goto done;
-
-		if (!(syncobj->flags & KGSL_SYNCOBJ_SW))
-			syncobj->flags |= KGSL_SYNCOBJ_HW;
 	}
 
 	if (type & (CMDOBJ_TYPE | MARKEROBJ_TYPE)) {
@@ -4857,9 +4871,6 @@ static void _unregister_device(struct kgsl_device *device)
 {
 	int minor;
 
-	if (device->gpu_sysfs_kobj.state_initialized)
-		kobject_put(&device->gpu_sysfs_kobj);
-
 	mutex_lock(&kgsl_driver.devlock);
 	for (minor = 0; minor < ARRAY_SIZE(kgsl_driver.devp); minor++) {
 		if (device == kgsl_driver.devp[minor]) {
@@ -5036,10 +5047,8 @@ int kgsl_device_platform_probe(struct kgsl_device *device)
 		goto error_pwrctrl_close;
 
 	status = kgsl_reclaim_init();
-	if (status) {
-		kgsl_mmu_close(device);
+	if (status)
 		goto error_pwrctrl_close;
-	}
 
 	rwlock_init(&device->context_lock);
 	spin_lock_init(&device->submit_lock);
@@ -5071,6 +5080,9 @@ void kgsl_device_platform_remove(struct kgsl_device *device)
 {
 
 	kgsl_device_snapshot_close(device);
+
+	if (device->gpu_sysfs_kobj.state_initialized)
+		kobject_del(&device->gpu_sysfs_kobj);
 
 	idr_destroy(&device->context_idr);
 	idr_destroy(&device->timelines);
@@ -5178,7 +5190,6 @@ int __init kgsl_core_init(void)
 	dev_set_name(&kgsl_driver.virtdev, "kgsl");
 	result = device_register(&kgsl_driver.virtdev);
 	if (result) {
-		put_device(&kgsl_driver.virtdev);
 		pr_err("kgsl: driver_register failed\n");
 		goto err;
 	}

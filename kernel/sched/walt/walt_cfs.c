@@ -375,10 +375,10 @@ static void walt_find_best_target(struct sched_domain *sd,
 	bool rtg_high_prio_task = task_rtg_high_prio(p);
 	cpumask_t visit_cpus;
 	struct walt_task_struct *wts = (struct walt_task_struct *) p->android_vendor_data1;
+	bool scan_ignore_cluster = false, ignored = false;
 #if IS_ENABLED(CONFIG_OPLUS_FEATURE_SCHED_ASSIST)
 	cpumask_t new_allowed_cpus;
 #endif
-	bool scan_ignore_cluster = false, ignored = false;
 
 	/* Find start CPU based on boost value */
 	start_cpu = fbt_env->start_cpu;

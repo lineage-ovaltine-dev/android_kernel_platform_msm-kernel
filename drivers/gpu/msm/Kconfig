@@ -129,3 +129,9 @@ config OPLUS_GPU_MINIDUMP
 	default y
 	help
 	 When enabled, oplus gpu minidump custom is enabled.
+
+config OPLUS_FEATURE_KGSL_BUS_NOLIMIT
+	bool "oplus gpu vote bus no limit"
+	depends on QCOM_KGSL
+	help
+	  When enabled, oplus gpu vote bus freq based last vote value and without any limit in opp table.

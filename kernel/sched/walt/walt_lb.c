@@ -14,7 +14,10 @@
 #if IS_ENABLED(CONFIG_OPLUS_FEATURE_FRAME_BOOST)
 #include <../kernel/oplus_cpu/sched/frame_boost/frame_group.h>
 #endif
-
+#if IS_ENABLED(CONFIG_OPLUS_FEATURE_ABNORMAL_FLAG)
+#include <../../oplus_cpu/oplus_overload/task_overload.h>
+#include <../kernel/oplus_cpu/sched/sched_assist/sa_common.h>
+#endif
 static inline unsigned long walt_lb_cpu_util(int cpu)
 {
 	struct walt_rq *wrq = (struct walt_rq *) cpu_rq(cpu)->android_vendor_data1;
@@ -652,7 +655,11 @@ void walt_lb_tick(struct rq *rq)
 		return;
 
 	walt_cfs_tick(rq);
-
+#if IS_ENABLED(CONFIG_OPLUS_FEATURE_ABNORMAL_FLAG)
+	ret = get_ux_state_type(p);
+	if (ret != UX_STATE_INHERIT && ret != UX_STATE_SCHED_ASSIST)
+		test_task_overload(p);
+#endif /* #OPLUS_FEATURE_ABNORMAL_FLAG */
 #if IS_ENABLED(CONFIG_OPLUS_FEATURE_FRAME_BOOST)
 	if (!rq->misfit_task_load && !need_up_migrate)
 #else

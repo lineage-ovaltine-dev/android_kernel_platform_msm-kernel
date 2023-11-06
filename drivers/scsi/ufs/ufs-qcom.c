@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2013-2021, Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/acpi.h>
@@ -20,16 +20,21 @@
 #include <linux/blk-mq.h>
 #include <linux/thermal.h>
 #include <linux/cpufreq.h>
+/*feature-devinfo-v001-1-begin*/
 #include <trace/hooks/ufshcd.h>
+/*feature-devinfo-v001-1-end*/
 #include <linux/debugfs.h>
 #include <linux/ipc_logging.h>
+/*feature-memorymonitor-v001-1-begin*/
 #include <scsi/scsi.h>
 #include <scsi/scsi_ioctl.h>
 #include <scsi/scsi_cmnd.h>
+/*feature-memorymonitor-v001-1-end*/
 
 //bsp.storage.ufs 2021.10.14 add for /proc/devinfo/ufs
 #include <soc/oplus/device_info.h>
 #include <linux/nvmem-consumer.h>
+/*google patch Random W/R performance improvement*/
 #include <linux/irq.h>
 
 #include "ufshcd.h"
@@ -39,7 +44,9 @@
 #include "ufshci.h"
 #include "ufs_quirks.h"
 #include "ufshcd-crypto-qti.h"
+/*feature-memorymonitor-v001-2-begin*/
 #include "../sd.h"
+/*feature-memorymonitor-v001-2-end*/
 #define UFS_QCOM_DEFAULT_DBG_PRINT_EN	\
 	(UFS_QCOM_DBG_PRINT_REGS_EN | UFS_QCOM_DBG_PRINT_TEST_BUS_EN)
 
@@ -74,13 +81,18 @@ static char android_boot_dev[ANDROID_BOOT_DEV_MAX];
 
 static DEFINE_PER_CPU(struct freq_qos_request, qos_min_req);
 
+/*feature-devinfo-v001-2-begin*/
 struct ufs_transmission_status_t ufs_transmission_status;
 struct device_attribute ufs_transmission_status_attr;
+/*feature-devinfo-v001-2-end*/
+/*feature-flashaging806-v001-1-begin*/
 struct unipro_signal_quality_ctrl signalCtrl;
+/*feature-flashaging806-v001-1-end*/
 int ufsplus_wb_status = 0;
 int ufsplus_hpb_status = 0;
 //static bool no_defer;
 
+static struct ufs_hba *debug_hba;
 /* clk freq mode */
 enum {
 	LOW_SVS,
@@ -2113,19 +2125,6 @@ static void ufs_qcom_override_pa_h8time(struct ufs_hba *hba)
 
 }
 
-static void ufs_qcom_override_pa_tx_hsg1_sync_len(struct ufs_hba *hba)
-{
-#define PA_TX_HSG1_SYNC_LENGTH 0x1552
-	int err;
-	int sync_len_val = 0x4A;
-
-	err = ufshcd_dme_peer_set(hba, UIC_ARG_MIB(PA_TX_HSG1_SYNC_LENGTH),
-				sync_len_val);
-	if (err)
-		dev_err(hba->dev, "Failed (%d) set PA_TX_HSG1_SYNC_LENGTH(%d)\n",
-				err, sync_len_val);
-}
-
 static inline bool
 ufshcd_is_valid_pm_lvl(enum ufs_pm_level lvl)
 {
@@ -2245,6 +2244,36 @@ static int ufs_qcom_update_max_clk_freq(struct ufs_hba *hba)
 	}
 out:
 	return ret;
+}
+
+static void ufs_qcom_override_pa_tx_hsg1_sync_len(struct ufs_hba *hba)
+{
+//modify G1  tx sync len to 4f
+#define PA_TX_HSG1_SYNC_LENGTH 0x1552
+#define PA_TX_HSG4_SYNC_LENGTH 0x15D0
+	int err;
+	int sync_len_val = 0x4F;
+
+	err = ufshcd_dme_peer_set(hba, UIC_ARG_MIB(PA_TX_HSG1_SYNC_LENGTH),
+				sync_len_val);
+
+	if (err)
+		dev_err(hba->dev, "Failed (%d) set PA_TX_HSG1_SYNC_LENGTH(%d)\n",
+				err, sync_len_val);
+
+	sync_len_val = 0;
+	err = ufshcd_dme_peer_get(hba, UIC_ARG_MIB(PA_TX_HSG1_SYNC_LENGTH),
+				&sync_len_val);
+
+	if (err)
+		dev_err(hba->dev, "Failed get PA_TX_HSG1_SYNC_LENGTH(%x)\n",
+				sync_len_val);
+
+	printk("SAMSUNG Solvit UFS: set PA_TX_HSG1_SYNC_LENGTH to 0x%x \n", sync_len_val);
+	if (hba->dev_info.model) {
+		printk("SAMSUNG Solvit UFS: model=%s\n", hba->dev_info.model);
+	}
+	return;
 }
 
 static int ufs_qcom_apply_dev_quirks(struct ufs_hba *hba)
@@ -2649,6 +2678,10 @@ ufs_qcom_query_ioctl(struct ufs_hba *hba, u8 lun, void __user *buffer)
 		case QUERY_DESC_IDN_INTERCONNECT:
 		case QUERY_DESC_IDN_GEOMETRY:
 		case QUERY_DESC_IDN_POWER:
+/* add for read healthy desc by ioctl */
+                /*feature-memorymonitor-v001-3-begin*/
+		case QUERY_DESC_IDN_HEALTH:
+                /*feature-memorymonitor-v001-3-end*/
 			index = 0;
 			break;
 		case QUERY_DESC_IDN_UNIT:
@@ -2693,6 +2726,8 @@ ufs_qcom_query_ioctl(struct ufs_hba *hba, u8 lun, void __user *buffer)
 		case QUERY_ATTR_IDN_EE_CONTROL:
 		case QUERY_ATTR_IDN_EE_STATUS:
 		case QUERY_ATTR_IDN_SECONDS_PASSED:
+/* add for read ffu status attribute by ioctl */
+		case QUERY_ATTR_IDN_FFU_STATUS:
 			index = 0;
 			break;
 		case QUERY_ATTR_IDN_DYN_CAP_NEEDED:
@@ -2813,6 +2848,7 @@ out:
 	return err;
 }
 
+/*feature-memorymonitor-v001-4-begin*/
 static int monitor_verify_command(unsigned char *cmd)
 {
     if (cmd[0] != 0x3B && cmd[0] != 0x3C && cmd[0] != 0xC0)
@@ -2918,6 +2954,7 @@ error_free_buffer:
 
 	return err;
 }
+/*feature-memorymonitor-v001-4-end*/
 
 /**
  * ufs_qcom_ioctl - ufs ioctl callback registered in scsi_host
@@ -2948,11 +2985,13 @@ ufs_qcom_ioctl(struct scsi_device *dev, unsigned int cmd, void __user *buffer)
 					   buffer);
 		pm_runtime_put_sync(hba->dev);
 		break;
+	/*feature-memorymonitor-v001-5-begin*/
 	case UFS_IOCTL_MONITOR:
 		pm_runtime_get_sync(hba->dev);
 		err = ufs_ioctl_monitor(dev, buffer);
 		pm_runtime_put_sync(hba->dev);
 		break;
+	/*feature-memorymonitor-v001-5-end*/
 	default:
 		err = -ENOIOCTLCMD;
 		dev_dbg(hba->dev, "%s: Unsupported ioctl cmd %d\n", __func__,
@@ -3306,7 +3345,7 @@ static int ufs_qcom_set_cur_therm_state(struct thermal_cooling_device *tcd,
 	switch (data) {
 	case UFS_QCOM_LVL_NO_THERM:
 		dev_warn(tcd->devdata, "UFS host thermal mitigation stops\n");
-
+		
 		if (host->irq_affinity_support)
 			atomic_set(&host->therm_mitigation, 0);
 		/* Set the default auto-hiberate idle timer to 5 ms */
@@ -3320,12 +3359,13 @@ static int ufs_qcom_set_cur_therm_state(struct thermal_cooling_device *tcd,
 	case UFS_QCOM_LVL_AGGR_THERM:
 	case UFS_QCOM_LVL_MAX_THERM:
 		dev_warn(tcd->devdata, "Going into UFS host thermal mitigation state, performance may be impacted before UFS host thermal mitigation stops\n");
-
+		
 		if (host->irq_affinity_support) {
 			/* Stop setting hi-pri to requests and set irq affinity to default value */
 			atomic_set(&host->therm_mitigation, 1);
 			ufs_qcom_toggle_pri_affinity(hba, false);
 		}
+		
 		/* Set the default auto-hiberate idle timer to 1 ms */
 		ufshcd_auto_hibern8_update(hba, ufs_qcom_us_to_ahit(1000));
 
@@ -3350,6 +3390,7 @@ struct thermal_cooling_device_ops ufs_thermal_ops = {
 	.set_cur_state = ufs_qcom_set_cur_therm_state,
 };
 
+/*feature-devinfo-v001-3-begin*/
 static void ufshcd_lrb_scsicmd_time_statistics(struct ufs_hba *hba, struct ufshcd_lrb *lrbp)
 {
 	if (lrbp->cmd->cmnd[0] == WRITE_10 || lrbp->cmd->cmnd[0] == WRITE_16) {
@@ -3540,8 +3581,10 @@ static void ufshcd_transmission_status_init_sysfs(struct ufs_hba *hba)
 	memset(&ufs_transmission_status, 0, sizeof(struct ufs_transmission_status_t));
 	ufs_transmission_status.transmission_status_enable = 1;
 }
+/*feature-devinfo-v001-3-end*/
 
 //#ifdef OPLUS_UFS_SIGNAL_QUALITY
+/*feature-flashaging806-v001-2-begin*/
 static void recordTimeStamp(
 	struct signal_quality *record,
 	enum ufs_event_type type
@@ -3556,11 +3599,17 @@ static void recordTimeStamp(
 	case UFS_EVT_DME_ERR:
 		if (STAMP_RECORD_MAX <= record->stamp_pos)
 			return;
-		if (0 == record->stamp_pos)
+		if (0 == record->stamp_pos) {
 			record->stamp[0] = cur_time;
+			record->hs[0] = debug_hba->pwr_info.pwr_tx;
+			record->gear[record->stamp_pos++] = debug_hba->pwr_info.gear_tx;
+		}
 		else if (cur_time > (record->stamp[record->stamp_pos - 1] +
-				STAMP_MIN_INTERVAL))
-			record->stamp[record->stamp_pos++] = cur_time;
+				STAMP_MIN_INTERVAL)) {
+			record->stamp[record->stamp_pos] = cur_time;
+			record->hs[record->stamp_pos] = debug_hba->pwr_info.pwr_tx;
+			record->gear[record->stamp_pos++] = debug_hba->pwr_info.gear_tx;
+		}
 		return;
 	default:
 		return;
@@ -3644,7 +3693,9 @@ void recordUniproErr(
 #define SEQ_DME_PRINT(x)    \
 	seq_printf(s, #x"\t%d\n", signalCtrl->record.unipro_DME_err_cnt[x])
 #define SEQ_STAMP_PRINT(x)  \
-	seq_printf(s, #x"\t%d\n", signalCtrl->record.stamp[x])
+	seq_printf(s, #x"\t%lld\n", signalCtrl->record.stamp[x])
+#define SEQ_GEAR_PRINT(x)  \
+	seq_printf(s, #x"\t%d %d\n", signalCtrl->record.hs[x], signalCtrl->record.gear[x])
 
 static int record_read_func(struct seq_file *s, void *v)
 {
@@ -3707,6 +3758,16 @@ static int record_read_func(struct seq_file *s, void *v)
 	SEQ_STAMP_PRINT(UNIPRO_7_STAMP);
 	SEQ_STAMP_PRINT(UNIPRO_8_STAMP);
 	SEQ_STAMP_PRINT(UNIPRO_9_STAMP);
+	SEQ_GEAR_PRINT(UNIPRO_0_GEAR);
+	SEQ_GEAR_PRINT(UNIPRO_1_GEAR);
+	SEQ_GEAR_PRINT(UNIPRO_2_GEAR);
+	SEQ_GEAR_PRINT(UNIPRO_3_GEAR);
+	SEQ_GEAR_PRINT(UNIPRO_4_GEAR);
+	SEQ_GEAR_PRINT(UNIPRO_5_GEAR);
+	SEQ_GEAR_PRINT(UNIPRO_6_GEAR);
+	SEQ_GEAR_PRINT(UNIPRO_7_GEAR);
+	SEQ_GEAR_PRINT(UNIPRO_8_GEAR);
+	SEQ_GEAR_PRINT(UNIPRO_9_GEAR);
 	return 0;
 }
 
@@ -3785,6 +3846,7 @@ void remove_signal_quality_proc(struct unipro_signal_quality_ctrl *signalCtrl)
 	}
 	return;
 }
+/*feature-flashaging806-v001-2-end*/
 //#endif /*OPLUS_UFS_SIGNAL_QUALITY*/
 
 /**
@@ -3824,6 +3886,7 @@ static int ufs_qcom_init(struct ufs_hba *hba)
 #endif
 	host->crash_on_err =
 		of_property_read_bool(np, "qcom,enable_crash_on_err");
+	debug_hba = hba;
 
 	/* Setup the reset control of HCI */
 	host->core_reset = devm_reset_control_get(hba->dev, "rst");
@@ -4000,9 +4063,13 @@ static int ufs_qcom_init(struct ufs_hba *hba)
 	}
 
 	ufs_qcom_init_sysfs(hba);
+	/*feature-devinfo-v001-4-begin*/
 	oplus_ufs_regist_tracepoint();
 	ufshcd_transmission_status_init_sysfs(hba);
+	/*feature-devinfo-v001-4-end*/
+        /*feature-flashaging806-v001-3-begin*/
 	create_signal_quality_proc(&signalCtrl);
+        /*feature-flashaging806-v001-3-end*/
 	/* Provide SCSI host ioctl API */
 	hba->host->hostt->ioctl = (int (*)(struct scsi_device *, unsigned int,
 				   void __user *))ufs_qcom_ioctl;
@@ -5054,14 +5121,21 @@ static void ufs_qcom_config_scaling_param(struct ufs_hba *hba,
 
 static struct ufs_dev_fix ufs_qcom_dev_fixups[] = {
 	UFS_FIX(UFS_VENDOR_SAMSUNG, UFS_ANY_MODEL,
-		UFS_DEVICE_QUIRK_PA_HIBER8TIME |
-		UFS_DEVICE_QUIRK_PA_TX_HSG1_SYNC_LENGTH),
+		UFS_DEVICE_QUIRK_PA_HIBER8TIME),
 	UFS_FIX(UFS_VENDOR_MICRON, UFS_ANY_MODEL,
 		UFS_DEVICE_QUIRK_DELAY_BEFORE_LPM),
 	UFS_FIX(UFS_VENDOR_SKHYNIX, UFS_ANY_MODEL,
 		UFS_DEVICE_QUIRK_DELAY_BEFORE_LPM),
 	UFS_FIX(UFS_VENDOR_WDC, UFS_ANY_MODEL,
 		UFS_DEVICE_QUIRK_HOST_PA_TACTIVATE),
+//#ifdef FIX_SAMSUNG_Solvit-FCx_PROTECTION_TIMER_EXPIRED
+	UFS_FIX(UFS_VENDOR_SAMSUNG, "KLUEG4RHGB-B0E1",
+		UFS_DEVICE_QUIRK_PA_TX_HSG1_SYNC_LENGTH),
+	UFS_FIX(UFS_VENDOR_SAMSUNG, "KLUFG8RHGB-B0E1",
+		UFS_DEVICE_QUIRK_PA_TX_HSG1_SYNC_LENGTH),
+	UFS_FIX(UFS_VENDOR_SAMSUNG, "KLUGGARHGB-B0E1",
+		UFS_DEVICE_QUIRK_PA_TX_HSG1_SYNC_LENGTH),
+//#endif
 	END_FIX
 };
 
@@ -5069,14 +5143,14 @@ static void ufs_qcom_fixup_dev_quirks(struct ufs_hba *hba)
 {
 	ufshcd_fixup_dev_quirks(hba, ufs_qcom_dev_fixups);
 }
-
+/*feature-flashaging806-v001-4-begin*/
 static void ufs_qcom_event_notify(struct ufs_hba *hba,
 	enum ufs_event_type evt, void *data)
 {
 	u32 reg = *(u32 *)data;
 	recordUniproErr(&signalCtrl, reg, evt);
 }
-
+/*feature-flashaging806-v001-4-end*/
 /*
  * struct ufs_hba_qcom_vops - UFS QCOM specific variant operations
  *
@@ -5102,7 +5176,9 @@ static const struct ufs_hba_variant_ops ufs_hba_qcom_vops = {
 	.setup_xfer_req         = ufs_qcom_qos,
 	.program_key		= ufs_qcom_ice_program_key,
 	.fixup_dev_quirks       = ufs_qcom_fixup_dev_quirks,
+        /*feature-flashaging806-v001-5-begin*/
 	.event_notify           = ufs_qcom_event_notify,
+        /*feature-flashaging806-v001-5-end*/
 };
 
 /**
@@ -5243,6 +5319,10 @@ static ssize_t dbg_state_show(struct device *dev,
 {
 	struct ufs_hba *hba = dev_get_drvdata(dev);
 	struct ufs_qcom_host *host = ufshcd_get_variant(hba);
+
+#if defined(CONFIG_UFS_DBG)
+	host->dbg_en = true;
+#endif
 
 	return scnprintf(buf, PAGE_SIZE, "%d\n", host->dbg_en);
 }
@@ -5477,9 +5557,8 @@ static void ufs_qcom_hook_send_command(void *param, struct ufs_hba *hba,
 				ufshcd_readl(hba,
 					REG_UTP_TRANSFER_REQ_DOOR_BELL),
 				sz);
-
 		if ((host->irq_affinity_support) && atomic_read(&host->hi_pri_en) && rq)
-			rq->cmd_flags |= REQ_HIPRI;
+			rq->cmd_flags |= REQ_HIPRI;				
 	}
 }
 
@@ -5739,7 +5818,9 @@ static int ufs_qcom_remove(struct platform_device *pdev)
 	pm_runtime_get_sync(&(pdev)->dev);
 	for (i = 0; i < r->num_groups; i++, qcg++)
 		remove_group_qos(qcg);
+         /*feature-flashaging806-v001-6-begin*/
 	remove_signal_quality_proc(&signalCtrl);
+         /*feature-flashaging806-v001-6-end*/
 	ufshcd_remove(hba);
 	return 0;
 }

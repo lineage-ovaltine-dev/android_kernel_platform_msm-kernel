@@ -36,6 +36,7 @@ static int max_led = 0;
 static int aw210xx_hw_enable(struct aw210xx *aw210xx, bool flag);
 static int aw210xx_led_init(struct aw210xx *aw210xx);
 static int aw210xx_led_change_mode(struct aw210xx *led, enum AW2023_LED_MODE mode);
+static int aw210xx_chipen_set(struct aw210xx *aw210xx, bool flag);
 
 /******************************************************
  *
@@ -393,18 +394,23 @@ static void aw210xx_brightness(struct aw210xx *led)
 		else
 			led->pdata->led->rgb_isnk_on &= ~W_ISNK_ON_MASK;
 		break;
+	default:
+		AW_LOG("no define id = %d brightness = %d\n", led->id, led->cdev.brightness);
+		return;
 	}
 	AW_LOG("rgb_isnk_on = 0x%x,led_enable = 0x%x\n\n", led->pdata->led->rgb_isnk_on,led->pdata->led->led_enable);
 	if (led->cdev.brightness > 0) {
 		if (!led->pdata->led->led_enable && led->pdata->led->rgb_isnk_on) {
-			if (aw210xx_hw_enable(led->pdata->led, true)) {
-				AW_LOG("aw210xx hw enable failed");
+			aw210xx_i2c_write(led, AW210XX_REG_RESET, 0x00);
+			usleep_range(2000, 2200);
+			if (aw210xx_led_init(led->pdata->led)){
+				AW_LOG("aw210xx active failed");
 			}
 		}
 	} else {
 		if (led->pdata->led->led_enable && !(led->pdata->led->rgb_isnk_on)) {
-			if (aw210xx_hw_enable(led->pdata->led, false)) {
-				AW_LOG("aw210xx hw disable failed");
+			if (aw210xx_chipen_set(led->pdata->led, false)) {
+				AW_LOG("aw210xx sleep failed");
 			}
 		}
 	}
@@ -439,7 +445,6 @@ static void aw210xx_brightness(struct aw210xx *led)
 				(led->pdata->rise_time_ms << 4 | led->pdata->hold_time_ms));
 		aw210xx_i2c_write(led, AW210XX_REG_ABMT1 ,
 				(led->pdata->fall_time_ms << 4 | led->pdata->off_time_ms));
-
 		aw210xx_i2c_write(led, AW210XX_REG_GBRH, 0xff);
 		aw210xx_i2c_write(led, AW210XX_REG_GBRL, 0x00);
 		aw210xx_i2c_write(led, AW210XX_REG_ABMCFG, 0x03);
@@ -455,10 +460,8 @@ static void aw210xx_brightness(struct aw210xx *led)
 		#ifdef BLINK_USE_AW210XX
 			aw210xx_i2c_write(led, AW210XX_REG_ABMT0 , 0x04);
 			aw210xx_i2c_write(led, AW210XX_REG_ABMT1 , 0x04);
-
 			aw210xx_i2c_write(led, AW210XX_REG_GBRH, 0xff);
 			aw210xx_i2c_write(led, AW210XX_REG_GBRL, 0x00);
-
 			aw210xx_i2c_write(led, AW210XX_REG_ABMCFG, 0x03);
 
 			for (i = 0; i < max_led; i++)
@@ -514,19 +517,22 @@ static void aw210xx_set_brightness(struct led_classdev *cdev,
 /*****************************************************
 * aw210xx basic function set
 *****************************************************/
-void aw210xx_chipen_set(struct aw210xx *aw210xx, bool flag)
+int aw210xx_chipen_set(struct aw210xx *aw210xx, bool flag)
 {
 	if (flag) {
 		aw210xx_i2c_write_bits(aw210xx,
 				AW210XX_REG_GCR,
 				AW210XX_BIT_CHIPEN_MASK,
 				AW210XX_BIT_CHIPEN_ENABLE);
+		aw210xx->led_enable = true;
 	} else {
 		aw210xx_i2c_write_bits(aw210xx,
 				AW210XX_REG_GCR,
 				AW210XX_BIT_CHIPEN_MASK,
 				AW210XX_BIT_CHIPEN_DISENA);
+		aw210xx->led_enable = false;
 	}
+	return 0;
 }
 
 static int aw210xx_hw_enable(struct aw210xx *aw210xx, bool flag)
@@ -537,13 +543,11 @@ static int aw210xx_hw_enable(struct aw210xx *aw210xx, bool flag)
 		if (flag) {
 			gpio_set_value_cansleep(aw210xx->enable_gpio, 1);
 			gpio_set_value_cansleep(aw210xx->vbled_enable_gpio, 1);
-			aw210xx->led_enable = true;
 			usleep_range(2000, 2500);
 			aw210xx_led_init(aw210xx);
 		} else {
 			gpio_set_value_cansleep(aw210xx->enable_gpio, 0);
 			gpio_set_value_cansleep(aw210xx->vbled_enable_gpio, 0);
-			aw210xx->led_enable = false;
 		}
 	} else {
 		AW_ERR("failed\n");
@@ -604,7 +608,9 @@ static int aw210xx_led_init(struct aw210xx *aw210xx)
 	aw210xx->sdmd_flag = 0;
 	aw210xx->rgbmd_flag = 0;
 	/* chip enable */
-	aw210xx_chipen_set(aw210xx, true);
+	if (aw210xx_chipen_set(aw210xx, true)) {
+		AW_LOG("aw210xx sleep failed");
+	}
 	usleep_range(1000, 1500);
 	/* sbmd enable */
 	aw210xx_sbmd_set(aw210xx, true);
@@ -673,7 +679,9 @@ void aw210xx_singleled_set(struct aw210xx *aw210xx,
 		uint32_t rgb_br)
 {
 	/* chip enable */
-	aw210xx_chipen_set(aw210xx, true);
+	if (aw210xx_chipen_set(aw210xx, true)) {
+		AW_LOG("aw210xx sleep failed");
+	}
 	/* global set */
 	aw210xx->set_current = rgb_br;
 	aw210xx_current_set(aw210xx);
@@ -903,11 +911,11 @@ static ssize_t aw210xx_effect_show(struct device *dev,
 	for (i = 0; i < (sizeof(aw210xx_cfg_array) /
 			sizeof(aw210xx_cfg_t)); i++) {
 		len += snprintf(buf + len, PAGE_SIZE - len, "effect[%u]: %pf\n",
-				i, aw210xx_cfg_array[i].p);
+				i, (unsigned char *)aw210xx_cfg_array[i].p);
 	}
 
 	len += snprintf(buf + len, PAGE_SIZE - len, "current effect[%d]: %pf\n",
-			aw210xx->effect, aw210xx_cfg_array[aw210xx->effect].p);
+			aw210xx->effect, (unsigned char *)aw210xx_cfg_array[aw210xx->effect].p);
 	return len;
 }
 
@@ -945,7 +953,9 @@ static ssize_t aw210xx_rgbcolor_store(struct device *dev,
 	uint32_t rgb_data = 0;
 
 	if (sscanf(buf, "%x %x", &rgb_num, &rgb_data) == 2) {
-		aw210xx_chipen_set(aw210xx, true);
+		if (aw210xx_chipen_set(aw210xx, true)) {
+			AW_LOG("aw210xx sleep failed");
+		}
 		aw210xx_sbmd_set(aw210xx, true);
 		aw210xx_rgbmd_set(aw210xx, true);
 		aw210xx_global_set(aw210xx);
@@ -1171,7 +1181,7 @@ static ssize_t aw210xx_led_support_attr_show (struct device *dev,
 
 	prj_id = get_project();
 
-	return snprintf(buf, PAGE_SIZE, "%s-%u\n",LED_SUPPORT_TYPE,led->cdev.max_brightness);
+	return snprintf(buf, PAGE_SIZE, "%s-%u\n",LED_SUPPORT_TYPE,(unsigned int)led->cdev.max_brightness);
 }
 
 static DEVICE_ATTR(support, 0664, aw210xx_led_support_attr_show, NULL);
@@ -1645,10 +1655,9 @@ static int aw210xx_i2c_probe(struct i2c_client *i2c,
 			goto fail_led_trigger;
 		}
 	}
-
-	aw210xx_led_init(aw210xx);
-
-	aw210xx_hw_enable(aw210xx, false);
+	if (aw210xx_chipen_set(aw210xx, false)) {
+		AW_LOG("aw210xx sleep failed");
+	}
 	AW_LOG("probe completed!\n");
 
 	return 0;

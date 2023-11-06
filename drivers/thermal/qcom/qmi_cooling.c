@@ -98,13 +98,6 @@ static char  device_clients[][QMI_CLIENT_NAME_LENGTH] = {
 	{"mmw2_dsc"},
 	{"mmw3_dsc"},
 	{"mmw_ific_dsc"},
-	{"modem_lte_sub1_dsc"},
-	{"modem_nr_sub1_dsc"},
-	{"modem_nr_scg_sub1_dsc"},
-	{"pa_lte_sdr0_sub1_dsc"},
-	{"pa_lte_sdr1_sub1_dsc"},
-	{"pa_nr_sdr0_sub1_dsc"},
-	{"pa_nr_sdr1_sub1_dsc"},
 };
 
 static int qmi_get_max_state(struct thermal_cooling_device *cdev,
@@ -192,7 +185,7 @@ qmi_send_exit:
 
 #define BUF_LEN		256
 #define NAME_LEN	128
-#define HORAE_QMI_NUM	3
+#define HORAE_QMI_NUM	4
 
 typedef struct horae_qmi_info {
 	char name[NAME_LEN];
@@ -207,6 +200,7 @@ static horae_qmi_info_t horae_qmi_cdev[HORAE_QMI_NUM] = {
 	{"modem_skin", 0, false, NULL},
 	{"modem_pa", 0, false, NULL},
 	{"modem_tj", 0, false, NULL},
+	{"modem_nr_dsc", 0, false, NULL},
 };
 
 static int horae_ctrl_check(char *name) {

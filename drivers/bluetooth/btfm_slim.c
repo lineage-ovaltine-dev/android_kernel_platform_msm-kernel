@@ -24,15 +24,12 @@
 #define DELAY_FOR_PORT_OPEN_MS (200)
 #define SLIM_MANF_ID_QCOM	0x217
 #define SLIM_PROD_CODE		0x221
-
 #define BT_CMD_SLIM_TEST        0xbfac
 
 struct class *btfm_slim_class;
 static int btfm_slim_major;
 
 struct btfmslim *btfm_slim_drv_data;
-
-static bool btfm_is_port_opening_delayed = true;
 
 static int btfm_num_ports_open;
 
@@ -239,11 +236,7 @@ int btfm_slim_disable_ch(struct btfmslim *btfmslim, struct btfmslim_ch *ch,
 	if (btfm_num_ports_open == 0 && (chipset_ver == QCA_HSP_SOC_ID_0200 ||
 		chipset_ver == QCA_HSP_SOC_ID_0210 ||
 		chipset_ver == QCA_HSP_SOC_ID_1201 ||
-		chipset_ver == QCA_HSP_SOC_ID_1211 ||
-		chipset_ver == QCA_APACHE_SOC_ID_0100 ||
-		chipset_ver == QCA_APACHE_SOC_ID_0110 ||
-		chipset_ver == QCA_APACHE_SOC_ID_0120 ||
-		chipset_ver == QCA_APACHE_SOC_ID_0121)) {
+		chipset_ver == QCA_HSP_SOC_ID_1211)) {
 		BTFMSLIM_INFO("SB reset needed after all ports disabled, sleeping");
 		msleep(DELAY_FOR_PORT_OPEN_MS);
 	}
@@ -410,15 +403,8 @@ int btfm_slim_hw_init(struct btfmslim *btfmslim)
 		chipset_ver ==  QCA_APACHE_SOC_ID_0100  ||
 		chipset_ver ==  QCA_APACHE_SOC_ID_0110  ||
 		chipset_ver ==  QCA_APACHE_SOC_ID_0120 ||
-		chipset_ver ==  QCA_APACHE_SOC_ID_0121 ||
-		chipset_ver ==  QCA_COMANCHE_SOC_ID_0101 ||
-		chipset_ver ==  QCA_COMANCHE_SOC_ID_0110 ||
-		chipset_ver ==  QCA_COMANCHE_SOC_ID_0120 ||
-		chipset_ver ==  QCA_COMANCHE_SOC_ID_0130 ||
-		chipset_ver ==  QCA_COMANCHE_SOC_ID_4130 ||
-		chipset_ver ==  QCA_COMANCHE_SOC_ID_5120 ||
-		chipset_ver ==  QCA_COMANCHE_SOC_ID_5130) {
-		BTFMSLIM_INFO("chipset is Chk/Apache/CMC, overwriting EA");
+		chipset_ver ==  QCA_APACHE_SOC_ID_0121) {
+		BTFMSLIM_INFO("chipset is Chk/Apache, overwriting EA");
 		slim->is_laddr_valid = false;
 		slim->e_addr.manf_id = SLIM_MANF_ID_QCOM;
 		slim->e_addr.prod_code = 0x220;
@@ -437,15 +423,15 @@ int btfm_slim_hw_init(struct btfmslim *btfmslim)
 		slim_ifd->e_addr.instance = 0x0;
 		slim_ifd->laddr = 0x0;
 	}
-	BTFMSLIM_INFO(
-		"PGD Enum Addr: manu id:%.02x prod code:%.02x dev idx:%.02x instance:%.02x",
-		slim->e_addr.manf_id, slim->e_addr.prod_code,
-		slim->e_addr.dev_index, slim->e_addr.instance);
+		BTFMSLIM_INFO(
+			"PGD Enum Addr: manu id:%.02x prod code:%.02x dev idx:%.02x instance:%.02x",
+			slim->e_addr.manf_id, slim->e_addr.prod_code,
+			slim->e_addr.dev_index, slim->e_addr.instance);
 
-	BTFMSLIM_INFO(
-		"IFD Enum Addr: manu id:%.02x prod code:%.02x dev idx:%.02x instance:%.02x",
-		slim_ifd->e_addr.manf_id, slim_ifd->e_addr.prod_code,
-		slim_ifd->e_addr.dev_index, slim_ifd->e_addr.instance);
+		BTFMSLIM_INFO(
+			"IFD Enum Addr: manu id:%.02x prod code:%.02x dev idx:%.02x instance:%.02x",
+			slim_ifd->e_addr.manf_id, slim_ifd->e_addr.prod_code,
+			slim_ifd->e_addr.dev_index, slim_ifd->e_addr.instance);
 
 	/* Assign Logical Address for PGD (Ported Generic Device)
 	 * enumeration address

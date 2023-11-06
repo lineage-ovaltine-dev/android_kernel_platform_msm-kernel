@@ -14,7 +14,6 @@
 
 static unsigned long panic_on_oom_timeout;
 struct task_struct *saved_tsk;
-static unsigned long free_pages_threshold = 0;
 
 
 #define PANIC_ON_OOM_DEFER_TIMEOUT (5*HZ)
@@ -82,15 +81,14 @@ static void balance_reclaim(void *unused, bool *balance_anon_file_reclaim)
 {
 	pg_data_t *pgdat;
 	struct zone *zone;
+	unsigned long free_pages_threshold = 0;
 	unsigned long normal_zone_free_pages = 0;
 
 	pgdat = NODE_DATA(0);
 	zone = &pgdat->node_zones[ZONE_NORMAL];
-	if(unlikely(!free_pages_threshold)) {
-		free_pages_threshold = min_wmark_pages(zone) + (low_wmark_pages(zone)-min_wmark_pages(zone))/2;
-	}
+	free_pages_threshold = low_wmark_pages(zone) + ((high_wmark_pages(zone)-low_wmark_pages(zone)) >> 1);
 
-	//we do not balancing reclaim anon and page cache files for reclaim when free < min + (low - min)/2;
+	/*we do not balance reclaim anon and page cache files for reclaim when free < low + (high - low)/2;*/
 	normal_zone_free_pages = zone_page_state(zone, NR_FREE_PAGES);
 	if(normal_zone_free_pages <  free_pages_threshold) {
 		*balance_anon_file_reclaim = false;
@@ -116,12 +114,6 @@ static void allow_subpage_alloc(void *data, bool *allow_subpage_alloc, struct de
 		*allow_subpage_alloc = true;
 		*size = PAGE_ALIGN(*size);
 	}
-}
-
-static void allow_shared_pages_reclaim(void *unused, struct vm_area_struct *vma, bool *allow_shared)
-{
-	/* Allow shared pages reclaim through process_madvise() only */
-	*allow_shared = (current->mm != vma->vm_mm);
 }
 
 static int __init init_mem_hooks(void)
@@ -174,17 +166,18 @@ static int __init init_mem_hooks(void)
 		return ret;
 	}
 
-	ret = register_trace_android_vh_madvise_cold_or_pageout(
-				allow_shared_pages_reclaim, NULL);
-	if (ret) {
-		pr_err("Failed to register madvise_cold_or_pageout_pte_range hook\n");
-		return ret;
-	}
 
 	return 0;
 }
 
+void exit_mem_hooks(void)
+{
+	unregister_trace_android_vh_oom_check_panic(
+			__oom_panic_defer, NULL);
+}
+
 module_init(init_mem_hooks);
+module_exit(exit_mem_hooks);
 
 MODULE_DESCRIPTION("Qualcomm Technologies, Inc. Memory Trace Hook Call-Back Registration");
 MODULE_LICENSE("GPL v2");

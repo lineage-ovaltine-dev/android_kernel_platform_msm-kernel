@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #define pr_fmt(fmt) "icnss2_qmi: " fmt
@@ -32,6 +32,7 @@
 #include "debug.h"
 #include "genl.h"
 #ifdef OPLUS_FEATURE_WIFI_BDF
+//Laixin@CONNECTIVITY.WIFI.HARDWARE.BDF.1065227 , 2019/10/17
 //Modify for: multi projects using different bdf
 #include <linux/fs.h>
 #include <asm/uaccess.h>
@@ -884,6 +885,7 @@ int icnss_wlfw_wlan_mac_req_send_sync(struct icnss_priv *priv,
 	struct qmi_txn txn;
 	int ret;
 #ifdef OPLUS_FEATURE_WIFI_BDF
+    //WuGuotian@CONNECTIVITY.WIFI.HARDWARE.BDF.1065227 , 2020/11/03, revert for factory write mac address order: write from mac_address[5] to mac_address[0],so mac address[5] is first
     int i;
     char revert_mac[QMI_WLFW_MAC_ADDR_SIZE_V01];
 #endif /* OPLUS_FEATURE_WIFI_BDF */
@@ -903,6 +905,7 @@ int icnss_wlfw_wlan_mac_req_send_sync(struct icnss_priv *priv,
 	icnss_pr_dbg("Sending WLAN mac req [%pM], state: 0x%lx\n",
 			     mac, priv->state);
 #ifdef OPLUS_FEATURE_WIFI_BDF
+    //WuGuotian@CONNECTIVITY.WIFI.HARDWARE.BDF.1065227 , 2020/11/03, revert for factory write mac address order: write from mac_address[5] to mac_address[0],so mac address[5] is first
     for (i = 0; i < QMI_WLFW_MAC_ADDR_SIZE_V01 ; i ++){
         revert_mac[i] = mac[QMI_WLFW_MAC_ADDR_SIZE_V01 - i -1];
     }
@@ -1136,6 +1139,7 @@ int icnss_wlfw_bdf_dnld_send_sync(struct icnss_priv *priv, u32 bdf_type)
 
 
 #ifdef OPLUS_FEATURE_WIFI_DCS_SWITCH
+    //wuguotian@CONNECTIVITY.WIFI.HARDWARE.SWITCH.2877804, 2020/02/24
     //Add for: check fw status for switch issue
     if (bdf_type == ICNSS_BDF_REGDB) {
         set_bit(CNSS_LOAD_REGDB_SUCCESS, &priv->loadRegdbState);
@@ -1217,6 +1221,7 @@ err_send:
 	release_firmware(fw_entry);
 err_req_fw:
 #ifdef OPLUS_FEATURE_WIFI_DCS_SWITCH
+    //wuguotian@CONNECTIVITY.WIFI.HARDWARE.SWITCH.2877804, 2020/02/24
     //Add for: check fw status for switch issue
     if (bdf_type == ICNSS_BDF_REGDB) {
         set_bit(CNSS_LOAD_REGDB_FAIL, &priv->loadRegdbState);
@@ -1306,8 +1311,7 @@ int icnss_wlfw_qdss_data_send_sync(struct icnss_priv *priv, char *file_name,
 		     resp->total_size == total_size) &&
 		    (resp->seg_id_valid == 1 && resp->seg_id == req->seg_id) &&
 		    (resp->data_valid == 1 &&
-		     resp->data_len <= QMI_WLFW_MAX_DATA_SIZE_V01) &&
-		    resp->data_len <= remaining) {
+		     resp->data_len <= QMI_WLFW_MAX_DATA_SIZE_V01)) {
 			memcpy(p_qdss_trace_data_temp,
 			       resp->data, resp->data_len);
 		} else {
@@ -2201,7 +2205,7 @@ int wlfw_qdss_trace_mem_info_send_sync(struct icnss_priv *priv)
 
 	req->mem_seg_len = priv->qdss_mem_seg_len;
 
-	if (priv->qdss_mem_seg_len >  QMI_WLFW_MAX_NUM_MEM_SEG_V01) {
+	if (priv->qdss_mem_seg_len > QMI_WLFW_MAX_NUM_MEM_SEG) {
 		icnss_pr_err("Invalid seg len %u\n",
 			     priv->qdss_mem_seg_len);
 		ret = -EINVAL;
@@ -2600,7 +2604,7 @@ static void wlfw_qdss_trace_req_mem_ind_cb(struct qmi_handle *qmi,
 
 	priv->qdss_mem_seg_len = ind_msg->mem_seg_len;
 
-	if (priv->qdss_mem_seg_len > QMI_WLFW_MAX_NUM_MEM_SEG_V01) {
+	if (priv->qdss_mem_seg_len > QMI_WLFW_MAX_NUM_MEM_SEG) {
 		icnss_pr_err("Invalid seg len %u\n",
 			     priv->qdss_mem_seg_len);
 		return;

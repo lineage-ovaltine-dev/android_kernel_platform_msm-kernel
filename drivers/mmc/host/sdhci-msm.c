@@ -30,6 +30,7 @@
 #include <linux/ipc_logging.h>
 #include <linux/clk/qcom.h>
 
+
 #include "sdhci-pltfm.h"
 #include "cqhci.h"
 #include "../core/core.h"
@@ -167,7 +168,8 @@
 #define CMUX_SHIFT_PHASE_SHIFT	24
 #define CMUX_SHIFT_PHASE_MASK	(7 << CMUX_SHIFT_PHASE_SHIFT)
 
-#define MSM_MMC_AUTOSUSPEND_DELAY_MS    10
+#define MSM_MMC_AUTOSUSPEND_DELAY_MS	200
+/*maohong@Cam.Drv,20220217 modified gating delay from 200 to 5*/
 #define MSM_CLK_GATING_DELAY_MS     5 /* msec */
 
 /* Timeout value to avoid infinite waiting for pwr_irq */
@@ -4647,6 +4649,7 @@ static void sdhci_finish_mrq(struct sdhci_host *host, struct mmc_request *mrq)
 	queue_work(host->complete_wq, &host->complete_work);
 }
 
+/* lihongmao@PSW.BSP.TP.Function, 2022/10/18, Add for explorer */
 static void sdhci_request_explorer(struct mmc_host *mmc, struct mmc_request *mrq)
 {
 	struct sdhci_host *host;
@@ -5026,6 +5029,7 @@ static int sdhci_msm_probe(struct platform_device *pdev)
 	/* Initialize sysfs entries */
 	sdhci_msm_init_sysfs_gating_qos(dev);
 
+	/* lihongmao@PSW.BSP.TP.Function, 2022/10/18, Add for explorer */
 	if (host->filter_enable == true) {
 		host->mmc_host_ops.init_card = sdhci_init_card;
 		host->mmc_host_ops.request = sdhci_request_explorer;

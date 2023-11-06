@@ -125,7 +125,7 @@ static bool waltgov_should_update_freq(struct waltgov_policy *wg_policy, u64 tim
 	 * to the separate rate limits.
 	 */
 #if IS_ENABLED(CONFIG_OPLUS_FEATURE_FRAME_BOOST)
-	if (wg_policy->flags & SCHED_CPUFREQ_DEF_FRAMEBOOST)
+	if ((wg_policy->flags & SCHED_CPUFREQ_DEF_FRAMEBOOST) || (wg_policy->flags & SCHED_CPUFREQ_EARLY_DET))
 		return true;
 #endif
 	delta_ns = time - wg_policy->last_freq_update_time;
@@ -456,6 +456,11 @@ static unsigned long waltgov_get_util(struct waltgov_cpu *wg_cpu)
 #define DEFAULT_CPU7_RTG_BOOST_FREQ 0
 #define DEFAULT_TARGET_LOAD_THRESH 1024
 #define DEFAULT_TARGET_LOAD_SHIFT 4
+
+#if IS_ENABLED(CONFIG_OPLUS_FEATURE_FRAME_BOOST)
+extern unsigned int ed_task_boost_mid_util;
+extern unsigned int ed_task_boost_max_util;
+#endif
 static void waltgov_walt_adjust(struct waltgov_cpu *wg_cpu, unsigned long cpu_util,
 				unsigned long nl, unsigned long *util,
 				unsigned long *max)
@@ -490,6 +495,18 @@ static void waltgov_walt_adjust(struct waltgov_cpu *wg_cpu, unsigned long cpu_ut
 			pl = mult_frac(pl, TARGET_LOAD, 100);
 		*util = max(*util, pl);
 	}
+#if IS_ENABLED(CONFIG_OPLUS_FEATURE_FRAME_BOOST)
+	if (wg_policy->flags & SCHED_CPUFREQ_EARLY_DET) {
+		trace_printk("FBG_CPUFREQ_EARLY_DET:cpu_util:%lu util:%lu ed_task_boost_type:%d mid_util:%d max_util:%d\n",
+				cpu_util, *util, ed_task_boost_type, ed_task_boost_mid_util, ed_task_boost_max_util);
+		if (ed_task_boost_type == ED_TASK_BOOST_MID) {
+			cpu_util = cpu_util < ed_task_boost_mid_util ? ed_task_boost_mid_util : cpu_util;
+		} else if (ed_task_boost_type == ED_TASK_BOOST_MAX) {
+			cpu_util = cpu_util < ed_task_boost_max_util ? ed_task_boost_max_util : cpu_util;
+		}
+		*util = max(*util, cpu_util);
+	}
+#endif
 }
 
 static inline unsigned long target_util(struct waltgov_policy *wg_policy,
@@ -515,11 +532,24 @@ static unsigned int waltgov_next_freq_shared(struct waltgov_cpu *wg_cpu, u64 tim
 	unsigned long util = 0, max = 1;
 	unsigned int j;
 	int boost = wg_policy->tunables->boost;
+#if IS_ENABLED(CONFIG_OPLUS_FEATURE_FRAME_BOOST)
+	bool is_ed_task = false;
+	u64 fbg_wall_clock = fbg_ktime_get_ns();
+#endif
 
 	for_each_cpu(j, policy->cpus) {
 		struct waltgov_cpu *j_wg_cpu = &per_cpu(waltgov_cpu, j);
 		unsigned long j_util, j_max, j_nl;
 
+#if IS_ENABLED(CONFIG_OPLUS_FEATURE_FRAME_BOOST)
+		struct rq *rq = cpu_rq(j);
+		struct task_struct *curr = rq->curr;
+
+		if (!is_ed_task && curr && fbg_is_ed_task(curr, fbg_wall_clock)) {
+			wg_policy->flags |= SCHED_CPUFREQ_EARLY_DET;
+			is_ed_task = true;
+		}
+#endif
 		/*
 		 * If the util value for all CPUs in a policy is 0, just using >
 		 * will result in a max value of 1. WALT stats can later update

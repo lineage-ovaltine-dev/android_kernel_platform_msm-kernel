@@ -176,3 +176,8 @@ obj-$(CONFIG_OPLUS_FEATURE_SUGOV_POWER_EFFIENCY) += oplus_cpu/cpufreq_effiency/
 #ifdef OPLUS_FEATURE_GKI_CPUFREQ_BOUNCING
 obj-$(CONFIG_OPLUS_FEATURE_GKI_CPUFREQ_BOUNCING) += oplus_cpu/cpufreq_bouncing/
 #endif /* OPLUS_FEATURE_GKI_CPUFREQ_BOUNCING */
+
+#ifdef OPLUS_FEATURE_ABNORMAL_FLAG
+#ziyu.qi@oppo.com, 2022/11/25, Add for task overload
+obj-$(CONFIG_OPLUS_FEATURE_ABNORMAL_FLAG) += oplus_cpu/oplus_overload/
+#endif

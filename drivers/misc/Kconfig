@@ -555,7 +555,6 @@ config HAPTIC_FEEDBACK
     help
       This option enables support for aw8697 series Haptic Driver Feedback.
 #endif /* OPLUS_FEATURE_LMVIBRATOR */
-
 config KINECTICS_XR_NORDIC
 	tristate "Nordic Misc driver support in XR Reference devices"
 	help
