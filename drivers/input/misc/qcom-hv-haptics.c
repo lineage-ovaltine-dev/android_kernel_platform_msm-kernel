@@ -4512,13 +4512,6 @@ static int haptics_parse_per_effect_dt(struct haptics_chip *chip,
 	if (!effect)
 		return -EINVAL;
 
-	rc = of_property_read_u32(node, "qcom,effect-id", &effect->id);
-	if (rc < 0) {
-		dev_err(chip->dev, "read qcom,effect-id failed, rc=%d\n",
-				rc);
-		return rc;
-	}
-
 	effect->vmax_mv = config->vmax_mv;
 	rc = of_property_read_u32(node, "qcom,wf-vmax-mv", &tmp);
 	if (rc < 0)
@@ -7097,6 +7090,7 @@ static int haptics_remove(struct platform_device *pdev)
 	free_pages((unsigned long)chip->start_buf, RICHTAP_MMAP_PAGE_ORDER);
 #endif //RICHTAP_FOR_PMIC_ENABLE
 	input_ff_destroy(chip->input_dev);
+	input_unregister_device(chip->input_dev);
 	dev_set_drvdata(chip->dev, NULL);
 
 	return 0;

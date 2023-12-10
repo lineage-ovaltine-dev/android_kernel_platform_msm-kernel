@@ -4,7 +4,6 @@
  *
  */
 
-#include <asm/div64.h>
 #include <dt-bindings/interconnect/qcom,ravelin.h>
 #include <linux/device.h>
 #include <linux/interconnect.h>
@@ -14,7 +13,6 @@
 #include <linux/of_device.h>
 #include <linux/of_platform.h>
 #include <linux/platform_device.h>
-#include <linux/sort.h>
 
 #include "icc-rpmh.h"
 #include "qnoc-qos.h"
@@ -192,23 +190,12 @@ static struct qcom_icc_node qxm_ipa = {
 	.links = { SLAVE_A2NOC_SNOC },
 };
 
-static struct qcom_icc_qosbox qxm_wcss_qos = {
-	.regs = icc_qnoc_qos_regs[ICC_QNOC_QOSGEN_TYPE_RPMH],
-	.num_ports = 1,
-	.offsets = { 0x1a000 },
-	.config = &(struct qos_config) {
-		.prio = 2,
-		.urg_fwd = 0,
-	},
-};
-
 static struct qcom_icc_node qxm_wcss = {
 	.name = "qxm_wcss",
 	.id = MASTER_WLAN,
 	.channels = 1,
 	.buswidth = 8,
 	.noc_ops = &qcom_qnoc4_ops,
-	.qosbox = &qxm_wcss_qos,
 	.num_links = 1,
 	.links = { SLAVE_A2NOC_SNOC },
 };
@@ -239,7 +226,7 @@ static struct qcom_icc_qosbox xm_qdss_etr_1_qos = {
 	.num_ports = 1,
 	.offsets = { 0x19000 },
 	.config = &(struct qos_config) {
-		.prio = 0,
+		.prio = 2,
 		.urg_fwd = 0,
 	},
 };
@@ -790,7 +777,7 @@ static struct qcom_icc_qosbox qnm_video_cpu_qos = {
 	.num_ports = 1,
 	.offsets = { 0x18000 },
 	.config = &(struct qos_config) {
-		.prio = 0,
+		.prio = 4,
 		.urg_fwd = 1,
 	},
 };
@@ -821,7 +808,7 @@ static struct qcom_icc_qosbox xm_pcie3_0_qos = {
 	.num_ports = 1,
 	.offsets = { 0x7000 },
 	.config = &(struct qos_config) {
-		.prio = 3,
+		.prio = 2,
 		.urg_fwd = 0,
 	},
 };
@@ -1797,6 +1784,7 @@ static struct qcom_icc_bcm bcm_acv = {
 	.name = "ACV",
 	.voter_idx = 0,
 	.enable_mask = 0x8,
+	.perf_mode_mask = 0x2,
 	.num_nodes = 1,
 	.nodes = { &ebi },
 };
@@ -1812,6 +1800,7 @@ static struct qcom_icc_bcm bcm_cn0 = {
 	.name = "CN0",
 	.voter_idx = 0,
 	.enable_mask = 0x1,
+	.keepalive = true,
 	.num_nodes = 57,
 	.nodes = { &qnm_cnoc3_cnoc2, &xm_qdss_dap,
 		   &qhs_ahb2phy0, &qhs_ahb2phy1,
@@ -1847,6 +1836,7 @@ static struct qcom_icc_bcm bcm_cn0 = {
 static struct qcom_icc_bcm bcm_mc0 = {
 	.name = "MC0",
 	.voter_idx = 0,
+	.keepalive = true,
 	.num_nodes = 1,
 	.nodes = { &ebi },
 };
@@ -1854,6 +1844,7 @@ static struct qcom_icc_bcm bcm_mc0 = {
 static struct qcom_icc_bcm bcm_mm0 = {
 	.name = "MM0",
 	.voter_idx = 0,
+	.keepalive_early = true,
 	.num_nodes = 1,
 	.nodes = { &qns_mem_noc_hf },
 };
@@ -1872,6 +1863,8 @@ static struct qcom_icc_bcm bcm_mm1 = {
 static struct qcom_icc_bcm bcm_qup0 = {
 	.name = "QUP0",
 	.voter_idx = 0,
+	.keepalive_early = true,
+	.vote_scale = 1,
 	.num_nodes = 1,
 	.nodes = { &qup0_core_slave },
 };
@@ -1879,6 +1872,8 @@ static struct qcom_icc_bcm bcm_qup0 = {
 static struct qcom_icc_bcm bcm_qup1 = {
 	.name = "QUP1",
 	.voter_idx = 0,
+	.keepalive_early = true,
+	.vote_scale = 1,
 	.num_nodes = 1,
 	.nodes = { &qup1_core_slave },
 };
@@ -1886,6 +1881,7 @@ static struct qcom_icc_bcm bcm_qup1 = {
 static struct qcom_icc_bcm bcm_sh0 = {
 	.name = "SH0",
 	.voter_idx = 0,
+	.keepalive = true,
 	.num_nodes = 1,
 	.nodes = { &qns_llcc },
 };
@@ -1905,6 +1901,7 @@ static struct qcom_icc_bcm bcm_sh1 = {
 static struct qcom_icc_bcm bcm_sn0 = {
 	.name = "SN0",
 	.voter_idx = 0,
+	.keepalive = true,
 	.num_nodes = 1,
 	.nodes = { &qns_gemnoc_sf },
 };
@@ -1949,29 +1946,30 @@ static struct qcom_icc_bcm bcm_sn7 = {
 
 static struct qcom_icc_bcm bcm_acv_disp = {
 	.name = "ACV",
-	.voter_idx = 0,
+	.voter_idx = 1,
 	.enable_mask = 0x1,
+	.perf_mode_mask = 0x2,
 	.num_nodes = 1,
 	.nodes = { &ebi_disp },
 };
 
 static struct qcom_icc_bcm bcm_mc0_disp = {
 	.name = "MC0",
-	.voter_idx = 0,
+	.voter_idx = 1,
 	.num_nodes = 1,
 	.nodes = { &ebi_disp },
 };
 
 static struct qcom_icc_bcm bcm_mm0_disp = {
 	.name = "MM0",
-	.voter_idx = 0,
+	.voter_idx = 1,
 	.num_nodes = 1,
 	.nodes = { &qns_mem_noc_hf_disp },
 };
 
 static struct qcom_icc_bcm bcm_mm1_disp = {
 	.name = "MM1",
-	.voter_idx = 0,
+	.voter_idx = 1,
 	.enable_mask = 0x1,
 	.num_nodes = 1,
 	.nodes = { &qnm_mdp_disp },
@@ -1979,14 +1977,14 @@ static struct qcom_icc_bcm bcm_mm1_disp = {
 
 static struct qcom_icc_bcm bcm_sh0_disp = {
 	.name = "SH0",
-	.voter_idx = 0,
+	.voter_idx = 1,
 	.num_nodes = 1,
 	.nodes = { &qns_llcc_disp },
 };
 
 static struct qcom_icc_bcm bcm_sh1_disp = {
 	.name = "SH1",
-	.voter_idx = 0,
+	.voter_idx = 1,
 	.enable_mask = 0x1,
 	.num_nodes = 1,
 	.nodes = { &qnm_pcie_disp },
@@ -2206,6 +2204,7 @@ static struct qcom_icc_node *gem_noc_nodes[] = {
 
 static char *gem_noc_voters[] = {
 	"hlos",
+	"disp"
 };
 
 static struct qcom_icc_desc ravelin_gem_noc = {
@@ -2264,6 +2263,7 @@ static struct qcom_icc_node *mc_virt_nodes[] = {
 
 static char *mc_virt_voters[] = {
 	"hlos",
+	"disp"
 };
 
 static struct qcom_icc_desc ravelin_mc_virt = {
@@ -2300,6 +2300,7 @@ static struct qcom_icc_node *mmss_noc_nodes[] = {
 
 static char *mmss_noc_voters[] = {
 	"hlos",
+	"disp"
 };
 
 static struct qcom_icc_desc ravelin_mmss_noc = {
@@ -2401,25 +2402,7 @@ static struct qcom_icc_desc ravelin_video_aggre_noc = {
 
 static int qnoc_probe(struct platform_device *pdev)
 {
-	const struct qcom_icc_desc *desc;
-	struct qcom_icc_node **qnodes;
-	size_t num_nodes, i;
 	int ret;
-
-	desc = of_device_get_match_data(&pdev->dev);
-	if (!desc)
-		return -EINVAL;
-
-	qnodes = desc->nodes;
-	num_nodes = desc->num_nodes;
-
-	for (i = 0; i < num_nodes; i++) {
-		if (!qnodes[i])
-			continue;
-
-		if (qnodes[i]->qosbox)
-			qnodes[i]->qosbox = NULL;
-	}
 
 	ret = qcom_icc_rpmh_probe(pdev);
 	if (ret)

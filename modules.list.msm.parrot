@@ -1,6 +1,8 @@
 gh_virt_wdt.ko
 qcom-pmu-lib.ko
 qcom_wdt_core.ko
+dcvs_fp.ko
+qcom-dcvs.ko
 clk-dummy.ko
 clk-rpmh.ko
 clk-qcom.ko
@@ -60,6 +62,7 @@ socinfo.ko
 stub-regulator.ko
 msm-geni-se.ko
 nvmem_qfprom.ko
+sdhci-msm-scaling.ko
 cqhci.ko
 sdhci-msm.ko
 phy-qcom-ufs.ko

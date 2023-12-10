@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/bitmap.h>
@@ -79,6 +79,8 @@
 #define SLP_ENABLE                    BIT(0)
 #define WAKEUP_COMMAND                BIT(1)
 #define SLEEP_COMMAND                 BIT(0)
+#define SLP_CTRL_CLK_EN               BIT(0)
+#define WR_ENABLE                     BIT(1)
 #define SZ_7MB                        7168
 #define SZ_6MB                        6144
 #define ACTIVE_STATE                  0x0
@@ -103,6 +105,8 @@
 #define SPAD_LPI_LB_PCB_PWR_STATUS1    0x0058
 #define SPAD_LPI_LB_PCB_PWR_STATUS2    0x005C
 #define SPAD_LPI_LB_PCB_PWR_STATUS3    0x0060
+#define SPAD_LPI_LB_CLK_EN_CFG         0x0104
+#define SPAD_LPI_LB_PRED_WAKEUP_EN     0x0284
 #define SPAD_LPI_LB_FF_CLK_ON_CTRL     0x1254
 
 static u32 llcc_offsets_v2[] = {
@@ -252,6 +256,12 @@ static const struct llcc_slice_config neo_xr_data[] =  {
 	{LLCC_EVCSLFT,  22,     0, 1, 1,        0x0,  0x0,   0, 0, 0, 1, 0, 0, 0 },
 	{LLCC_EVCSRGHT, 23,     0, 1, 1,        0x0,  0x0,   0, 0, 0, 1, 0, 0, 0 },
 	{LLCC_SPAD,     24,  7168, 1, 1,        0x0,  0x0,   0, 0, 0, 1, 0, 0, 0 },
+};
+
+static const struct llcc_slice_config neo_xr_v2_data[] =  {
+};
+
+static const struct llcc_slice_config neo_xr_v3_data[] =  {
 };
 
 static const struct llcc_slice_config neo_sg_data[] =  {
@@ -428,21 +438,6 @@ static const struct qcom_llcc_config shima_cfg = {
 	.size		= ARRAY_SIZE(shima_data),
 };
 
-static const struct qcom_llcc_config neo_xr_cfg = {
-	.sct_data	= neo_xr_data,
-	.size		= ARRAY_SIZE(neo_xr_data),
-};
-
-static const struct qcom_llcc_config neo_sg_cfg = {
-	.sct_data	= neo_sg_data,
-	.size		= ARRAY_SIZE(neo_sg_data),
-};
-
-static const struct qcom_llcc_config neo_sg_v2_cfg = {
-	.sct_data	= neo_sg_v2_data,
-	.size		= ARRAY_SIZE(neo_sg_v2_data),
-};
-
 static const struct qcom_llcc_config waipio_cfg = {
 	.sct_data	= waipio_data,
 	.size		= ARRAY_SIZE(waipio_data),
@@ -456,6 +451,30 @@ static const struct qcom_llcc_config cape_cfg = {
 static const struct qcom_llcc_config ukee_cfg = {
 	.sct_data       = ukee_data,
 	.size           = ARRAY_SIZE(ukee_data),
+};
+
+static const struct qcom_llcc_config neo_cfg[] = {
+	{
+		.sct_data	= neo_xr_data,
+		.size		= ARRAY_SIZE(neo_xr_data),
+	},
+	{
+		.sct_data	= neo_xr_v2_data,
+		.size		= ARRAY_SIZE(neo_xr_v2_data),
+	},
+	{
+		.sct_data	= neo_xr_v3_data,
+		.size		= ARRAY_SIZE(neo_xr_v3_data),
+	},
+	{
+		.sct_data	= neo_sg_data,
+		.size		= ARRAY_SIZE(neo_sg_data),
+	},
+	{
+		.sct_data	= neo_sg_v2_data,
+		.size		= ARRAY_SIZE(neo_sg_v2_data),
+	},
+
 };
 
 static struct llcc_drv_data *drv_data = (void *) -EPROBE_DEFER;
@@ -560,9 +579,14 @@ static inline int llcc_spad_check_regmap(void)
 
 static inline int llcc_spad_clk_on_ctrl(void)
 {
+	u32 lpi_reg;
+	u32 lpi_val;
+
 	/* Clear FF_CLK_ON override and override value CSR */
-	return regmap_write(drv_data->spad_or_bcast_regmap,
-			    SPAD_LPI_LB_FF_CLK_ON_CTRL, 0);
+	lpi_reg = SPAD_LPI_LB_FF_CLK_ON_CTRL;
+	regmap_read(drv_data->spad_or_bcast_regmap, lpi_reg, &lpi_val);
+	lpi_val &= ~(FF_CLK_ON_OVERRIDE | FF_CLK_ON_OVERRIDE_VALUE);
+	return regmap_write(drv_data->spad_or_bcast_regmap, lpi_reg, lpi_val);
 }
 
 static int llcc_spad_poll_state(struct llcc_slice_desc *desc, u32 s0, u32 s1)
@@ -629,6 +653,19 @@ static int llcc_spad_act_slp_wake(void)
 			   lpi_val);
 	if (ret)
 		return ret;
+	lpi_reg = SPAD_LPI_LB_CLK_EN_CFG;
+	regmap_read(drv_data->spad_or_bcast_regmap, lpi_reg, &lpi_val);
+	lpi_val |= SLP_CTRL_CLK_EN;
+	ret = regmap_write(drv_data->spad_or_bcast_regmap, lpi_reg,
+			   lpi_val);
+	if (ret)
+		return ret;
+	lpi_reg = SPAD_LPI_LB_PRED_WAKEUP_EN;
+	lpi_val = WR_ENABLE;
+	ret = regmap_write(drv_data->spad_or_bcast_regmap, lpi_reg,
+			   lpi_val);
+	if (ret)
+		return ret;
 
 	/* As activity based sleep and wakeup tracks inflight transactions,
 	 * idle cycles etc for an PCB few other CSRs needs to be configured
@@ -678,7 +715,8 @@ static int llcc_spad_init(struct llcc_slice_desc *desc)
 	 * following CSR will be 1
 	 */
 	lpi_reg = SPAD_LPI_LB_FF_CLK_ON_CTRL;
-	lpi_val = FF_CLK_ON_OVERRIDE | FF_CLK_ON_OVERRIDE_VALUE;
+	regmap_read(drv_data->spad_or_bcast_regmap, lpi_reg, &lpi_val);
+	lpi_val |= FF_CLK_ON_OVERRIDE | FF_CLK_ON_OVERRIDE_VALUE;
 	ret = regmap_write(drv_data->spad_or_bcast_regmap, lpi_reg,
 			   lpi_val);
 	if (ret)
@@ -689,6 +727,12 @@ static int llcc_spad_init(struct llcc_slice_desc *desc)
 	 * based sleep and wakeup.
 	 */
 	lpi_reg = SPAD_LPI_LB_PCB_ENABLE;
+	lpi_val = 0;
+	ret = regmap_write(drv_data->spad_or_bcast_regmap, lpi_reg,
+			   lpi_val);
+	if (ret)
+		return ret;
+	lpi_reg = SPAD_LPI_LB_PRED_WAKEUP_EN;
 	lpi_val = 0;
 	ret = regmap_write(drv_data->spad_or_bcast_regmap, lpi_reg,
 			   lpi_val);
@@ -1211,6 +1255,8 @@ static int qcom_llcc_probe(struct platform_device *pdev)
 	struct device_node *tcm_memory_node;
 	void __iomem *ch_reg = NULL;
 	u32 sz, ch_reg_sz, ch_reg_off, ch_num;
+	bool multiple_llcc = false;
+	u32 sct_config;
 
 	drv_data = devm_kzalloc(dev, sizeof(*drv_data), GFP_KERNEL);
 	if (!drv_data) {
@@ -1275,6 +1321,9 @@ static int qcom_llcc_probe(struct platform_device *pdev)
 		goto err;
 	}
 
+	if (!of_property_read_u32(dev->of_node, "qcom,sct-config", &sct_config))
+		multiple_llcc = true;
+
 	ch_reg = devm_platform_ioremap_resource_byname(pdev, "multi_ch_reg");
 	if (!IS_ERR(ch_reg)) {
 		if (of_property_read_u32_index(dev->of_node, "multi-ch-off", 1, &ch_reg_sz)) {
@@ -1296,7 +1345,11 @@ static int qcom_llcc_probe(struct platform_device *pdev)
 
 		devm_iounmap(dev, ch_reg);
 		ch_reg = NULL;
+	} else if (multiple_llcc) {
+		llcc_cfg = cfg[sct_config].sct_data;
+		sz = cfg[sct_config].size;
 	} else {
+
 		llcc_cfg = cfg->sct_data;
 		sz = cfg->size;
 	}
@@ -1367,9 +1420,7 @@ static const struct of_device_id qcom_llcc_of_match[] = {
 	{ .compatible = "qcom,sdm845-llcc", .data = &sdm845_cfg },
 	{ .compatible = "qcom,lahaina-llcc", .data = &lahaina_cfg },
 	{ .compatible = "qcom,shima-llcc", .data = &shima_cfg },
-	{ .compatible = "qcom,neo-xr-llcc", .data = &neo_xr_cfg },
-	{ .compatible = "qcom,neo-sg-llcc", .data = &neo_sg_cfg },
-	{ .compatible = "qcom,neo-sg-v2-llcc", .data = &neo_sg_v2_cfg },
+	{ .compatible = "qcom,neo-llcc", .data = &neo_cfg },
 	{ .compatible = "qcom,waipio-llcc", .data = &waipio_cfg },
 	{ .compatible = "qcom,diwali-llcc", .data = &diwali_cfg },
 	{ .compatible = "qcom,cape-llcc", .data = &cape_cfg },

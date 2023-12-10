@@ -1671,6 +1671,18 @@ static const struct adsp_data parrot_wpss_resource = {
 	.ssctl_id = 0x19,
 };
 
+static const struct adsp_data ravelin_wpss_resource = {
+	.crash_reason_smem = 626,
+	.firmware_name = "wpss.mdt",
+	.pas_id = 6,
+	.minidump_id = 4,
+	.uses_elf64 = true,
+	.ssr_name = "wpss",
+	.sysmon_name = "wpss",
+	.qmp_name = "wpss",
+	.ssctl_id = 0x19,
+};
+
 static const struct adsp_data neo_wpss_resource = {
 	.crash_reason_smem = 626,
 	.firmware_name = "wpss.mdt",
@@ -1724,6 +1736,7 @@ static const struct of_device_id adsp_of_match[] = {
 	{ .compatible = "qcom,anorak-cdsp-pas", .data = &anorak_cdsp_resource},
 	{ .compatible = "qcom,ravelin-adsp-pas", .data = &ravelin_adsp_resource},
 	{ .compatible = "qcom,ravelin-modem-pas", .data = &ravelin_mpss_resource},
+	{ .compatible = "qcom,ravelin-wpss-pas", .data = &ravelin_wpss_resource},
 	{ },
 };
 MODULE_DEVICE_TABLE(of, adsp_of_match);

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2002,2007-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/slab.h>
@@ -228,7 +229,7 @@ kgsl_mmu_log_fault_addr(struct kgsl_mmu *mmu, u64 pt_base,
 
 	spin_lock(&kgsl_driver.ptlock);
 	list_for_each_entry(pt, &kgsl_driver.pagetable_list, list) {
-		if (kgsl_mmu_pagetable_get_ttbr0(pt) == pt_base) {
+		if (kgsl_mmu_pagetable_get_ttbr0(pt) == MMU_SW_PT_BASE(pt_base)) {
 			if ((addr & ~(PAGE_SIZE-1)) == pt->fault_addr) {
 				ret = 1;
 				break;
@@ -506,10 +507,20 @@ void kgsl_mmu_close(struct kgsl_device *device)
 		mmu->mmu_ops->mmu_close(mmu);
 }
 
-int kgsl_mmu_pagetable_get_context_bank(struct kgsl_pagetable *pagetable)
+int kgsl_mmu_pagetable_get_context_bank(struct kgsl_pagetable *pagetable,
+	struct kgsl_context *context)
 {
 	if (PT_OP_VALID(pagetable, get_context_bank))
-		return pagetable->pt_ops->get_context_bank(pagetable);
+		return pagetable->pt_ops->get_context_bank(pagetable, context);
+
+	return -ENOENT;
+}
+
+int kgsl_mmu_pagetable_get_asid(struct kgsl_pagetable *pagetable,
+		struct kgsl_context *context)
+{
+	if (PT_OP_VALID(pagetable, get_asid))
+		return pagetable->pt_ops->get_asid(pagetable, context);
 
 	return -ENOENT;
 }

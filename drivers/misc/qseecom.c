@@ -477,6 +477,10 @@ static int __qseecom_scm_call2_locked(uint32_t smc_id, struct qseecom_scm_desc *
 	int ret = 0;
 	int retry_count = 0;
 
+	if (desc == NULL) {
+		return -EINVAL;
+	}
+
 	do {
 		ret = qcom_scm_qseecom_call(smc_id, desc, false);
 		if ((ret == -EBUSY) || (desc && (desc->ret[0] == -QSEE_RESULT_FAIL_APP_BUSY))) {
@@ -3182,6 +3186,28 @@ static int qseecom_prepare_unload_app(struct qseecom_dev_handle *data)
 	pr_debug("prepare to unload app(%d)(%s), pending %d\n",
 		data->client.app_id, data->client.app_name,
 		data->client.unload_pending);
+
+	/* For keymaster we are not going to unload so no need to add it in
+	 * unload app pending list as soon as we identify release ion buffer
+	 * and return .
+	 */
+	if (!memcmp(data->client.app_name, "keymaste", strlen("keymaste"))) {
+		if (data->client.dmabuf) {
+			/* Each client will get same KM TA loaded handle but will
+			 * allocate separate shared buffer during loading of TA,
+			 * as client can't unload KM TA so we will only free out
+			 * shared buffer and return early to avoid any ion buffer leak.
+			 */
+			qseecom_vaddr_unmap(data->client.sb_virt, data->client.sgt,
+				data->client.attach, data->client.dmabuf);
+			MAKE_NULL(data->client.sgt,
+				data->client.attach, data->client.dmabuf);
+		}
+		__qseecom_free_tzbuf(&data->sglistinfo_shm);
+		data->released = true;
+		return 0;
+	}
+
 	if (data->client.unload_pending)
 		return 0;
 	entry = kzalloc(sizeof(*entry), GFP_KERNEL);
@@ -6470,7 +6496,7 @@ static int qseecom_create_key(struct qseecom_dev_handle *data,
 	struct qseecom_create_key_req create_key_req;
 	struct qseecom_key_generate_ireq generate_key_ireq;
 	struct qseecom_key_select_ireq set_key_ireq;
-	uint32_t entries = 0;
+	int32_t entries = 0;
 
 	ret = copy_from_user(&create_key_req, argp, sizeof(create_key_req));
 	if (ret) {
@@ -6615,7 +6641,7 @@ static int qseecom_wipe_key(struct qseecom_dev_handle *data,
 	struct qseecom_wipe_key_req wipe_key_req;
 	struct qseecom_key_delete_ireq delete_key_ireq;
 	struct qseecom_key_select_ireq clear_key_ireq;
-	uint32_t entries = 0;
+	int32_t entries = 0;
 
 	ret = copy_from_user(&wipe_key_req, argp, sizeof(wipe_key_req));
 	if (ret) {
